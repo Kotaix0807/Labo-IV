@@ -57,7 +57,8 @@ void print(const char *format, ...)
 
 static inline void T_move(int x, int y)
 {
-    print("\033[%d;%dH", y, x);
+    /* No usamos print para no alterar las coordenadas al emitir secuencias ANSI */
+    fprintf(stdout, "\033[%d;%dH", y, x);
     fflush(stdout);
     T_cursor_x = x;
     T_cursor_y = y;
@@ -65,7 +66,7 @@ static inline void T_move(int x, int y)
 
 static inline void T_setColor(uint8_t r, uint8_t g, uint8_t b)
 {
-    print("\033[38;2;%u;%u;%um", r, g, b);
+    fprintf(stdout, "\033[38;2;%u;%u;%um", r, g, b);
 }
 
 static inline void T_resetColor(void)

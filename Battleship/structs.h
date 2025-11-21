@@ -16,7 +16,7 @@ typedef struct player_ ply;
 /**
  * @brief Inicializar estructura jugador
  * 
- * @return ply 
+ * @return struct ply 
  */
 ply initPly(){
     ply current;
@@ -25,5 +25,4 @@ ply initPly(){
     current.id = 0;
     return current;
 }
-
 #endif /* STRUCTS_H */

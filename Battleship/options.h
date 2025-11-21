@@ -19,10 +19,11 @@ int initGame()
     }
     print("Hola %s!\n", current.name);
     print("Elige un modo de juego:\n");
-    printf("X: %d\n", T_cursor_x);
-    printf("Y: %d\n", T_cursor_y);
+    //printf("X: %d\n", T_cursor_x);
+    //printf("Y: %d\n", T_cursor_y);
     T_placeC(T_cursor_x, T_cursor_y + 1, '>', 0, 0, 255);
-    T_placeStr(T_cursor_x, T_cursor_y + 1, "HOLA\n", 0, 0, 255);
+    T_placeStr(1, T_cursor_y + 1, "HOLA\n", 0, 0, 255);
+    T_placeStr(T_cursor_x, T_cursor_y + 1, "YOU DIED\n", 255, 0, 0);
 
 
 
