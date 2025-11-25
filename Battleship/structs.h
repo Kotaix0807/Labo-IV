@@ -6,13 +6,12 @@
 
 typedef char array;
 
-struct player_{
+typedef struct player_{
     char *name;
     int id;
     array table[10][10];
-};
+}ply;
 
-typedef struct player_ ply;
 /**
  * @brief Inicializar estructura jugador
  * 
