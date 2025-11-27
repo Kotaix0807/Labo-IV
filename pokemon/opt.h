@@ -13,31 +13,24 @@ void credits();
 int mainMenu(ply *Player)
 {
     printTitle();
-    menu_box *options = malloc(sizeof(menu_box));
-    if(!options)
-    {
-        endwin();
-        return 1;
-    }
     char *choices[] = {
         "Local",
         "Cambiar nombre",
         "Creditos",
         "Salir"
     };
-    initMenu(options, "Menu", choices, sizeof(choices) / sizeof(char *));
-    int selection;
-    while ((selection = run_menu(options)) == -1);
+    int selection = menu("Menu", choices, 4);
     switch(selection)
     {
         case 0:
-           // dial("dial.txt", NULL, 1, 1);
             break;
         case 1:
             askName(Player);
             break;
         case 2:
             credits();
+            break;
+        default:
             break;
     }
     return selection;
@@ -121,10 +114,7 @@ void credits()
     };
 
     int rows = (int)(sizeof(txt) / sizeof(char *));
-    int box_w = largestStr(txt, rows) + 2;
-    int box_h = rows + 2;
-    int x = (getmaxx(stdscr) - box_w) / 2;
-    int y = (getmaxy(stdscr) - box_h) / 2;
-    dialFromStr(txt, rows, "Creditos", x, y, ALIGN_CENTER);
+    dialFromStr(txt, rows, "Creditos", 0, 0, ALIGN_CENTER, TXT_CENTER);
 }
+
 #endif

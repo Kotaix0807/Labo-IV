@@ -12,6 +12,9 @@
 #define ALIGN_CENTER 1
 #define ALIGN_RIGHT 2
 
+#define NON_CENTER
+#define TXT_CENTER 1
+
 typedef struct menu_{
     WINDOW *win;
     const char *title;
@@ -46,6 +49,7 @@ void initMenu(menu_box *m, const char *title, char *choices[], int n);
 void printMenu(menu_box *m);
 int run_menu(menu_box *m);
 void freeMenu(menu_box *m);
+int menu(const char *title, char *choices[], int n);
 
 void initAwns(awns_box *b, const char *title, int n);
 void printAwns(awns_box *b);
@@ -55,7 +59,7 @@ char *Ask(const char *question, int chars);
 void initTxtBox(txt_box *t, char *file, char *txt[], int n ,const char *title, int x, int y, int align);
 void printBox(txt_box *t);
 void dialFromFile(char *file, const char *title, int x, int y, int align);
-void dialFromStr(char *txt[], int n, const char *title, int x, int y, int align);
+void dialFromStr(char *txt[], int n, const char *title, int x, int y, int align, int center);
 
 /**
  * @brief Inicializa un menu de opciones
@@ -89,7 +93,8 @@ void printMenu(menu_box *m)
 {
     int start = (m->w - (int)strlen(m->title)) / 2;
     box(m->win, 0, 0);
-    mvwprintw(m->win, 0, start, "%s", m->title);
+    if(m->title)
+        mvwprintw(m->win, 0, start, "%s", m->title);
     for(int i = 0; i < m->n_choice; i++)
     {
         if(i == m->sel)
@@ -128,9 +133,7 @@ int run_menu(menu_box *m)
                 ++m->sel;
             break;
         case '\n':
-            int sel = m->sel;
-            freeMenu(m);
-            return sel;
+            return m->sel;
         default:
             break;
     }
@@ -160,6 +163,18 @@ void freeMenu(menu_box *m)
     m->n_choice = 0;
     m->sel = 0;
     free(m);
+}
+
+int menu(const char *title, char *choices[], int n)
+{
+    int selection = -1;
+    menu_box *options = malloc(sizeof(menu_box));
+    if(!options)
+        return -2;
+    initMenu(options, title, choices, n);
+    while ((selection = run_menu(options)) == -1);
+    freeMenu(options);
+    return selection;
 }
 
 /**
@@ -342,16 +357,34 @@ void delBox(txt_box *t)
 void dialFromFile(char *file, const char *title, int x, int y, int align)
 {
     txt_box *blob = malloc(sizeof(txt_box));
-    initTxtBox(blob, file, NULL, 0, title, x, y, align);
+    if(center)
+    {
+        int box_w = largestStr(txt, n) + 2;
+        int box_h = n + 2;
+        int x_ = (getmaxx(stdscr) - box_w) / 2;
+        int y_ = (getmaxy(stdscr) - box_h) / 2;
+        initTxtBox(blob, file, NULL, n, title, x_, y_, align);
+    }
+    else
+        initTxtBox(blob, file, NULL, n, title, x, y, align);
     printBox(blob);
     wgetch(blob->win);
     delBox(blob);
 }
 
-void dialFromStr(char *txt[], int n, const char *title, int x, int y, int align)
+void dialFromStr(char *txt[], int n, const char *title, int x, int y, int align, int center)
 {
     txt_box *blob = malloc(sizeof(txt_box));
-    initTxtBox(blob, NULL, txt, n, title, x, y, align);
+    if(center)
+    {
+        int box_w = largestStr(txt, n) + 2;
+        int box_h = n + 2;
+        int x_ = (getmaxx(stdscr) - box_w) / 2;
+        int y_ = (getmaxy(stdscr) - box_h) / 2;
+        initTxtBox(blob, NULL, txt, n, title, x_, y_, align);
+    }
+    else
+        initTxtBox(blob, NULL, txt, n, title, x, y, align);
     printBox(blob);
     wgetch(blob->win);
     delBox(blob);
