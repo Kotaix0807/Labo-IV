@@ -7,9 +7,16 @@
 #include <ncurses.h>
 #include "tools.h"
 
+typedef struct move_{
+    char *name;
+    char type[15];
+    unsigned int power;
+}move;
+
 typedef struct pokemon_{
     char *name;
-    char *move_set[4];
+    char *type;
+    move *move_set[4];
     char **ascii;
     int n_ascii;
     int w;
