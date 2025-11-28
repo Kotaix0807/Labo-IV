@@ -62,7 +62,7 @@ int main(void)
     //askName(&Player);
 
 
-    while(mainMenu(&Player) != 4);
+    while(mainMenu(&Player) != 3);
     free(Player.name);
     endwin();
     quitAudio();

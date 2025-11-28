@@ -13,6 +13,7 @@ int largestOpt(char *choices[], int n_choice, const char *title);
 unsigned long fileLines(const char *file, int opt);
 char **readText(const char *file);
 size_t u8_len(const char *s);
+int replace_fmt(char **arr, int idx, const char *arg);
 
 /**
  * @brief Recorre un arreglo de strings, y devuelve la cantidad del string mas largo
@@ -171,5 +172,33 @@ size_t u8_len(const char *s)
         p += r;
     }
     return count;
+}
+/**
+ * @brief Formatea una entrada con %s y reemplaza el puntero en el arreglo.
+ *
+ * No libera el string anterior (pensado para literales).
+ *
+ * @param arr arreglo de strings
+ * @param idx indice a formatear
+ * @param arg argumento que reemplaza %s
+ * @return 0 en exito, -1 en error
+ */
+int replace_fmt(char **arr, int idx, const char *arg)
+{
+    if (!arr || idx < 0 || !arg)
+        return -1;
+
+    const char *tmpl = arr[idx];
+    if (!tmpl)
+        return -1;
+
+    size_t needed = (size_t)snprintf(NULL, 0, tmpl, arg);
+    char *buf = malloc(needed + 1);
+    if (!buf)
+        return -1;
+
+    snprintf(buf, needed + 1, tmpl, arg);
+    arr[idx] = buf;
+    return 0;
 }
 #endif /* TOOLS_H */

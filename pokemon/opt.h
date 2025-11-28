@@ -9,7 +9,7 @@ int mainMenu(ply *Player);
 int askName(ply *Player);
 void printTitle();
 void credits();
-void local(ply *cur);
+void askPkmn(ply *cur);
 void preview();
 void render_combat_scene(ply *cur);
 
@@ -17,17 +17,17 @@ int mainMenu(ply *Player)
 {
     //printTitle();
     char *choices[] = {
-        "Ver Pokemon", //Local
+        "Render Scene", //Local
         "Ventana", //Cambiar Nombre
         "Creditos", //Creditos
-        "Render scene",
         "Salir" //Salir
     };
-    int selection = menu("Menu", choices, sizeof(choices)/sizeof(char*));
+    int selection = menu("Menu", choices, sizeof(choices)/sizeof(char*), -1, -1);
     switch(selection)
     {
         case 0:
-            local(Player);
+            askPkmn(Player);
+            render_combat_scene(Player);
             break;
         case 1:
             //askName(Player);
@@ -37,8 +37,6 @@ int mainMenu(ply *Player)
             credits();
             break;
         case 3:
-            local(Player);
-            render_combat_scene(Player);
             break;
         default:
             break;
@@ -124,17 +122,17 @@ void credits()
     };
 
     int rows = (int)(sizeof(txt) / sizeof(char *));
-    dialFromStr(txt, rows, "Creditos", 0, 0, ALIGN_CENTER, TXT_CENTER);
+    dialFromStr(txt, rows, "Creditos", 0, 0, ALIGN_CENTER);
 }
 
-void local(ply *cur)
+void askPkmn(ply *cur)
 {
     char *pklist[] = {
         "Venosaur",
         "Blastoise",
         "Charizard"
     };
-    int pkmn = menu("Entrenador, elige tu pokemon", pklist, sizeof(pklist)/sizeof(char*));
+    int pkmn = menu("Elige tu pokemon", pklist, sizeof(pklist)/sizeof(char*), -1, -1);
     pkmnSet(cur, pklist[pkmn]);
 }
 
@@ -152,15 +150,17 @@ void render_combat_scene(ply *cur)
     wclear(stdscr);
     wrefresh(stdscr);
 
-    int yM, xM;
+    int xM, yM;
     getmaxyx(stdscr, yM, xM);
 
+   //Por ahora se queda asi hasta que se incluya la comunicacion de procesos
     pkmn *enemy = malloc(sizeof(pkmn));
     if(!enemy)
         return;
-    enemy->name = "Blastoise";
-    enemy->ascii = readText("art/blastoise.txt");
-    enemy->n_ascii = (int)fileLines("art/blastoise.txt", 0);
+    enemy->name = "Charizard";
+    enemy->ascii = readText("art/charizard.txt");
+    enemy->n_ascii = (int)fileLines("art/charizard.txt", 0);
+
     const char *moves_enemy[] = {
         "Movimiento_1",
         "Movimiento_2",
@@ -173,7 +173,24 @@ void render_combat_scene(ply *cur)
     enemy->defense = 50;
     enemy->speed = 50;
     enemy->hp = 100;
+    enemy->w = largestStr_bra(enemy->ascii, enemy->n_ascii);
+    WINDOW *player_win = printPkmnW(cur->monster, 45, 15);
+    WINDOW *enemy_win = printPkmnW(enemy, (xM - enemy->w - 2), 0);
 
+    char *dialogue[] = {
+        "Vamos %s!, yo te elijo!"
+    };
+    int n = (int)(sizeof(dialogue) / sizeof(char *));
+    int h = 10 - n;
+    replace_fmt(dialogue, 0, cur->monster->name);
+    //dialFromStr(dialogue, h, "Dialogo", 1, (yM - h - 2), ALIGN_LEFT);
+    txt_box *combat_box = custTxtBox_str(dialogue, n, "Dialogo", 1, (yM - h - 2), 30, h, 0);
+
+    menu("Que deseas hacer?", cur->monster->move_set, 4, 1, (yM - 6));
+    delBox(combat_box);
+
+//xMax - win_w
+    /*
     int enemy_w = largestStr_bra(enemy->ascii, enemy->n_ascii);
     int enemy_h = enemy->n_ascii + 2;
 
@@ -209,17 +226,11 @@ void render_combat_scene(ply *cur)
 
     int ch;
     while ((ch = getch()) != '\n' && ch != 'q');
-
+    */
     /* limpiar y liberar recursos */
-    wborder(enemy_win, ' ', ' ', ' ',' ',' ',' ',' ',' ');
-    wclear(enemy_win);
-    wrefresh(enemy_win);
-    delwin(enemy_win);
 
-    wborder(player_win, ' ', ' ', ' ',' ',' ',' ',' ',' ');
-    wclear(player_win);
-    wrefresh(player_win);
-    delwin(player_win);
+    clearWin(enemy_win);
+    clearWin(player_win);
 
     if (enemy->ascii)
     {

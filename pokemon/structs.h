@@ -24,12 +24,20 @@ typedef struct player_{
     pkmn *monster;
 }ply;
 
+ply initPly();
+void pkmnSet(ply *curr, char *name);
+void printPkmn(pkmn *monster, int x, int y);
+WINDOW *movePkmnWindow(pkmn *monster);
+WINDOW *printPkmnW(pkmn *monster, int x, int y);
+void clearWin(WINDOW *win);
+
 /**
  * @brief Inicializar estructura jugador
  * 
  * @return struct ply 
  */
-ply initPly(){
+ply initPly()
+{
     ply current;
     current.name = NULL;
     current.monster = NULL;
@@ -44,7 +52,6 @@ void pkmnSet(ply *curr, char *name)
     {
         curr->monster->ascii = readText("art/venosaur.txt");
         curr->monster->n_ascii = fileLines("art/venosaur.txt", 0);
-        curr->monster->w = largestStr_bra(curr->monster->ascii, curr->monster->n_ascii);
         const char *moves[] = {
             "Movimiento_1",
             "Movimiento_2",
@@ -62,7 +69,6 @@ void pkmnSet(ply *curr, char *name)
     {
         curr->monster->ascii = readText("art/charizard.txt");
         curr->monster->n_ascii = fileLines("art/charizard.txt", 0);
-        curr->monster->w = largestStr_bra(curr->monster->ascii, curr->monster->n_ascii);
         const char *moves[] = {
             "Movimiento_1",
             "Movimiento_2",
@@ -80,7 +86,6 @@ void pkmnSet(ply *curr, char *name)
     {
         curr->monster->ascii = readText("art/blastoise.txt");
         curr->monster->n_ascii = fileLines("art/blastoise.txt", 0);
-        curr->monster->w = largestStr_bra(curr->monster->ascii, curr->monster->n_ascii);
         const char *moves[] = {
             "Movimiento_1",
             "Movimiento_2",
@@ -94,6 +99,7 @@ void pkmnSet(ply *curr, char *name)
         curr->monster->speed = 50;
         curr->monster->hp = 100;
     }
+    curr->monster->w = largestStr_bra(curr->monster->ascii, curr->monster->n_ascii);
 }
 
 void printPkmn(pkmn *monster, int x, int y)
@@ -101,7 +107,7 @@ void printPkmn(pkmn *monster, int x, int y)
     int yM, xM;
     getmaxyx(stdscr, yM, xM);
     int h = monster->n_ascii;
-    int w = 50;
+    int w = monster->w;
     int win_h = h + 2;
     int win_w = w + 2;
 
@@ -128,25 +134,23 @@ void printPkmn(pkmn *monster, int x, int y)
  * @brief Permite mover la ventana del pokemon con flechas; con 'r' muestra la posicion actual.
  *        Salir con ENTER o 'q'.
  */
-void movePkmnWindow(pkmn *monster)
+WINDOW *movePkmnWindow(pkmn *monster)
 {
     int yM, xM;
     getmaxyx(stdscr, yM, xM);
-    int h = monster->n_ascii;
-    int w = 50;
-    int win_h = h + 2;
-    int win_w = w + 2;
+    int win_h = monster->n_ascii;
+    int win_w = monster->w;
     int pos_y = (yM - win_h) / 2;
     int pos_x = (xM - win_w) / 2;
 
-    WINDOW *win = newwin(win_h, win_w, pos_y, pos_x);
+    WINDOW *win = printPkmnW(monster, pos_x, pos_y);
     keypad(win, TRUE);
 
     while (1)
     {
         werase(win);
         box(win, 0, 0);
-        for (int i = 0; i < h; i++)
+        for (int i = 0; i < win_h; i++)
             mvwprintw(win, i + 1, 1, "%s", monster->ascii[i]);
         wrefresh(win);
 
@@ -197,7 +201,47 @@ void movePkmnWindow(pkmn *monster)
     //wborder(win, ' ', ' ', ' ',' ',' ',' ',' ',' ');
     //wclear(win);
     //wrefresh(win);
+    //delwin(win);
     refresh();
+    return win;
+}
+
+WINDOW *printPkmnW(pkmn *monster, int x, int y)
+{
+    int yM, xM;
+    getmaxyx(stdscr, yM, xM);
+    int h = monster->n_ascii;
+    int w = monster->w;
+    int win_h = h + 2;
+    int win_w = w + 2;
+
+    int win_y, win_x;
+
+    if(y < 0)
+        win_y = (yM - win_h) / 2;
+    else
+        win_y = y;
+
+    if(x < 0)
+        win_x = (xM - win_w) / 2;
+    else
+        win_x = x;
+
+    WINDOW *win = newwin(win_h, win_w, win_y, win_x);
+    box(win, 0, 0);
+    for(int i = 0; i < h; i++)
+        mvwprintw(win, i + 1, 1, "%s", monster->ascii[i]);
+    mvwprintw(win, 0, 2, "[%s]", monster->name);
+    wrefresh(win);
+    return win;
+
+}
+
+void clearWin(WINDOW *win)
+{
+    wborder(win, ' ', ' ', ' ',' ',' ',' ',' ',' ');
+    wclear(win);
+    wrefresh(win);
     delwin(win);
 }
 #endif /* STRUCTS_H */
