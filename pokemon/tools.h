@@ -4,11 +4,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <locale.h>
+#include <wchar.h>
 
 int largestStr(char *arr[], int n);
+int largestStr_bra(char *arr[], int n);
 int largestOpt(char *choices[], int n_choice, const char *title);
 unsigned long fileLines(const char *file, int opt);
 char **readText(const char *file);
+size_t u8_len(const char *s);
 
 /**
  * @brief Recorre un arreglo de strings, y devuelve la cantidad del string mas largo
@@ -33,7 +37,29 @@ int largestStr(char *arr[], int n)
     }
     return max;
 }
-
+/**
+ * @brief Recorre un arreglo de strings en braile, y devuelve la cantidad del string mas largo
+ * 
+ * @param arr arreglo strings
+ * @param n cantidad de strings
+ * @return int -> cantidad del str mas largo
+ */
+int largestStr_bra(char *arr[], int n)
+{
+    if(n <= 0)
+    {
+        perror("No array length");
+        exit(1);
+    }
+    int max = 0, count = 0;
+    for(int i = 0; i < n; i++)
+    {
+        count = (int)u8_len(arr[i]);
+        if(count > max)
+            max = count;
+    }
+    return max;
+}
 /**
  * @brief Calcula el ancho optimo para la ventana de menu
  * 
@@ -112,10 +138,9 @@ char **readText(const char *file)
     }
 
     for (unsigned long i = 0; i < lines; i++) {
-        arr[i] = calloc(chars + 2, sizeof(char)); /* room for newline + NUL */
+        arr[i] = calloc(chars + 2, sizeof(char));
         if (!arr[i]) {
             fclose(txt);
-            /* free anything already allocated */
             for (unsigned long j = 0; j < i; j++)
                 free(arr[j]);
             free(arr);
@@ -129,4 +154,22 @@ char **readText(const char *file)
     return arr;
 }
 
+size_t u8_len(const char *s)
+{
+    mbstate_t st = {0};
+    size_t count = 0;
+    const char *p = s;
+    wchar_t wc;
+    while (*p)
+    {
+        size_t r = mbrtowc(&wc, p, MB_CUR_MAX, &st);
+        if (r == (size_t)-1 || r == (size_t)-2)
+            break;
+        if (r == 0)
+            break;
+        count++;
+        p += r;
+    }
+    return count;
+}
 #endif /* TOOLS_H */

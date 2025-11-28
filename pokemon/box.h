@@ -12,7 +12,7 @@
 #define ALIGN_CENTER 1
 #define ALIGN_RIGHT 2
 
-#define NON_CENTER
+#define NON_CENTER 0
 #define TXT_CENTER 1
 
 typedef struct menu_{
@@ -60,6 +60,15 @@ void initTxtBox(txt_box *t, char *txt[], int n ,const char *title, int x, int y,
 void printBox(txt_box *t);
 void dialFromFile(const char *file, const char *title, int x, int y, int align, int center);
 void dialFromStr(char *txt[], int n, const char *title, int x, int y, int align, int center);
+
+void previewWindow(int width, int height);
+
+txt_box *TxtBox_str(char *txt[], int n, const char *title, int x, int y, int align, int center);
+txt_box *TxtBox_file(const char *file, const char *title, int x, int y, int align, int center);
+
+void initCustTxtBox(txt_box *t, char *txt[], int n ,const char *title, int x, int y, int w, int h, int align);
+txt_box *custTxtBox_str(char *txt[], int n, const char *title, int x, int y, int w, int h, int align, int center);
+txt_box *custTxtBox_file(const char *file, const char *title, int x, int y, int w, int h, int align, int center);
 
 /**
  * @brief Inicializa un menu de opciones
@@ -379,19 +388,241 @@ void dialFromStr(char *txt[], int n, const char *title, int x, int y, int align,
     wgetch(blob->win);
     delBox(blob);
 }
-#endif
 
-/*
-                                  ,'\
-    _.----.        ____         ,'  _\   ___    ___     ____
-_,-'       `.     |    |  /`.   \,-'    |   \  /   |   |    \  |`.
-\      __    \    '-.  | /   `.  ___    |    \/    |   '-.   \ |  |
- \.    \ \   |  __  |  |/    ,','_  `.  |          | __  |    \|  |
-   \    \/   /,' _`.|      ,' / / / /   |          ,' _`.|     |  |
-    \     ,-'/  /   \    ,'   | \/ / ,`.|         /  /   \  |     |
-     \    \ |   \_/  |   `-.  \    `'  /|  |    ||   \_/  | |\    |
-      \    \ \      /       `-.`.___,-' |  |\  /| \      /  | |   |
-       \    \ `.__,'|  |`-._    `|      |__| \/ |  `.__,'|  | |   |
-        \_.-'       |__|    `-._ |              '-.|     '-.| |   |
-                                `'                            '-._|
-*/
+void previewWindow(int width, int height)
+{
+    int yM, xM;
+    getmaxyx(stdscr, yM, xM);
+
+    int win_h = height + 2;
+    int win_w = width + 2;
+
+    if (win_h > yM) win_h = yM;
+    if (win_w > xM) win_w = xM;
+
+    int pos_y = (yM - win_h) / 2;
+    int pos_x = (xM - win_w) / 2;
+
+    WINDOW *win = newwin(win_h, win_w, pos_y, pos_x);
+    keypad(win, TRUE);
+
+    while (1)
+    {
+        werase(win);
+        box(win, 0, 0);
+        mvwprintw(win, 0, 2, "Preview (%dx%d)", win_h - 2, win_w - 2);
+        wrefresh(win);
+
+        int ch = wgetch(win);
+        if (ch == 'q' || ch == '\n')
+            break;
+
+        switch (ch)
+        {
+            case KEY_UP:    pos_y--; break;
+            case KEY_DOWN:  pos_y++; break;
+            case KEY_LEFT:  pos_x--; break;
+            case KEY_RIGHT: pos_x++; break;
+            case 'r':
+                mvprintw(yM - 1, 1, "Ventana en x = %d, y = %d", pos_x, pos_y);
+                clrtoeol();
+                refresh();
+                break;
+            default:
+                break;
+        }
+
+        /* límites para que no se salga de la pantalla */
+        if (pos_y < 0) pos_y = 0;
+        if (pos_x < 0) pos_x = 0;
+        if (pos_y > yM - win_h) pos_y = yM - win_h;
+        if (pos_x > xM - win_w) pos_x = xM - win_w;
+
+        /* limpiar la posición anterior antes de mover */
+        wborder(win, ' ', ' ', ' ',' ',' ',' ',' ',' ');
+        wrefresh(win);
+        mvwin(win, pos_y, pos_x);
+    }
+
+    mvprintw(yM - 1, 0, " ");
+    clrtoeol();
+    refresh();
+    delwin(win);
+}
+
+
+txt_box *TxtBox_str(char *txt[], int n, const char *title, int x, int y, int align, int center)
+{
+    txt_box *blob = malloc(sizeof(txt_box));
+    if(center)
+    {
+        int box_w = largestStr(txt, n) + 2;
+        int box_h = n + 2;
+        int x_ = (getmaxx(stdscr) - box_w) / 2;
+        int y_ = (getmaxy(stdscr) - box_h) / 2;
+        initTxtBox(blob, txt, n, title, x_, y_, align);
+    }
+    else
+        initTxtBox(blob, txt, n, title, x, y, align);
+    printBox(blob);
+    return blob;
+}
+
+txt_box *TxtBox_file(const char *file, const char *title, int x, int y, int align, int center)
+{
+    txt_box *blob = malloc(sizeof(txt_box));
+    if(center)
+    {
+        int box_w = (int)fileLines(file, 1) + 2;
+        int box_h = (int)fileLines(file, 0) + 2;
+        int x_ = (getmaxx(stdscr) - box_w) / 2;
+        int y_ = (getmaxy(stdscr) - box_h) / 2;
+        initTxtBox(blob, readText(file), (int)fileLines(file, 0), title, x_, y_, align);
+        blob->owns_txt = 1;
+    }
+    else
+    {
+        initTxtBox(blob, readText(file), (int)fileLines(file, 0), title, x, y, align);
+        blob->owns_txt = 1;
+    }
+    printBox(blob);
+    return blob;
+}
+
+
+void initCustTxtBox(txt_box *t, char *txt[], int n ,const char *title, int x, int y, int w, int h, int align)
+{
+    int yM, xM;
+    getmaxyx(stdscr, yM, xM);
+
+    if (title) {
+        t->title = title;
+        t->title_len = (int)strlen(title);
+    } else {
+        t->title = NULL;
+        t->title_len = 0;
+    }
+
+    t->align = align;
+    t->txt = txt;
+
+    int temp_w = largestStr(txt, n);
+    int temp_h = n;
+    if (w < temp_w)
+        w = temp_w;
+    if (h < temp_h)
+        h = temp_h;
+
+    int max_w;
+    int max_h;
+    if (xM > 2)
+        max_w = xM - 2;
+    else
+        max_w = 1;
+
+    if (yM > 2)
+        max_h = yM - 2;
+    else
+        max_h = 1;
+
+
+    if (w > max_w)
+        w = max_w;
+
+    if (h > max_h)
+        h = max_h;
+
+    t->w = w;
+    t->h = h;
+    t->owns_txt = 0;
+
+    if (x < 0)
+        x = 0;
+
+    if (y < 0)
+        y = 0;
+
+
+    if (x > xM - (t->w + 2))
+        x = xM - (t->w + 2);
+
+    if (y > yM - (t->h + 2))
+        y = yM - (t->h + 2);
+
+    t->win = newwin(t->h + 2, t->w + 2, y, x);
+    keypad(t->win, TRUE);
+}
+
+void custPrintBox(txt_box *t, int n)
+{
+
+    /*
+    static int txt_align_start(txt_box *t, int line_len)
+    {
+        int space = t->w - line_len;
+        if (space < 0)
+            space = 0;
+        switch (t->align) {
+            case ALIGN_RIGHT:
+                return 1 + space;
+            case ALIGN_CENTER:
+                return 1 + space / 2;
+            case ALIGN_LEFT:
+            default:
+                return 1;
+        }
+    }
+
+    */
+    box(t->win, 0, 0);
+    for (int i = 0; i < n; i++) {
+        //int len = (int)strlen(t->txt[i]);
+        int start = 1;//txt_align_start(t, len);
+        mvwprintw(t->win, i + 1, start, "%s", t->txt[i]);
+    }
+    if(t->title != NULL)
+        mvwprintw(t->win, 0, (t->w - t->title_len) / 2, "%s", t->title);
+    wrefresh(t->win);
+}
+
+txt_box *custTxtBox_str(char *txt[], int n, const char *title, int x, int y, int w, int h, int align, int center)
+{
+    txt_box *blob = malloc(sizeof(txt_box));
+    if(center)
+    {
+        int box_w = largestStr(txt, n) + 2;
+        int box_h = n + 2;
+        int x_ = (getmaxx(stdscr) - box_w) / 2;
+        int y_ = (getmaxy(stdscr) - box_h) / 2;
+        initCustTxtBox(blob, txt, n, title, x_, y_, w, h, align);
+    }
+    else
+        initCustTxtBox(blob, txt, n, title, x, y, w, h, align);
+    custPrintBox(blob, n);
+    return blob;
+}
+
+txt_box *custTxtBox_file(const char *file, const char *title, int x, int y, int w, int h, int align, int center)
+{
+    txt_box *blob = malloc(sizeof(txt_box));
+    if(center)
+    {
+        int box_w = (int)fileLines(file, 1) + 2;
+        int box_h = (int)fileLines(file, 0) + 2;
+        int x_ = (getmaxx(stdscr) - box_w) / 2;
+        int y_ = (getmaxy(stdscr) - box_h) / 2;
+        initCustTxtBox(blob, readText(file), (int)fileLines(file, 0), title, x_, y_, w, h, align);
+        blob->owns_txt = 1;
+    }
+    else
+    {
+        initCustTxtBox(blob, readText(file), (int)fileLines(file, 0), title, x, y, w, h, align);
+        blob->owns_txt = 1;
+    }
+    printBox(blob);
+    return blob;
+}
+
+
+
+#endif

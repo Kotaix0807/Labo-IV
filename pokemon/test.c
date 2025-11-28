@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <locale.h>
 #include "structs.h"
 #include "tools.h"
 #include "opt.h"
@@ -29,6 +30,7 @@ int main(void)
     endwin();
     return 0;
 }*/
+/*
 int main(void)
 {
     setlocale(LC_ALL, "");
@@ -51,4 +53,44 @@ int main(void)
     getch();
     endwin();
     return 0;
+}*/
+
+int main(void)
+{
+    setlocale(LC_ALL, "");
+    initscr();
+    curs_set(0);
+    noecho();
+    cbreak();
+
+    int yM, xM;
+    getmaxyx(stdscr, yM, xM);
+    printw("Window size x = %d, y = %d\n", xM, yM);
+
+    getch();
+    endwin();
+    return 0;
 }
+
+/*
+int main(void)
+{
+    setlocale(LC_ALL, "");
+    initscr();
+    curs_set(0);
+    noecho();
+    cbreak();
+
+    char *txt[] = {
+        "Hola",
+        "Prueba",
+        "De",
+        "texto"
+    };
+    txt_box *box1 = TxtBox_str(txt, sizeof(txt)/sizeof(char*), NULL, 0, 0, ALIGN_CENTER, TXT_CENTER);
+    getch();
+    delBox(box1);
+    endwin();
+}*/
+
+
