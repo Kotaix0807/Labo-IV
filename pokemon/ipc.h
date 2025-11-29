@@ -4,10 +4,12 @@
 
 #include <sys/types.h>
 
-#define MSG_KEY_PATH "ipc.h"   /* archivo existente usado para ftok */
-#define MSG_KEY_ID   'P'   /* mismo char en admin y jugadores  */
+#define MSG_KEY_PATH "ipc.h"   /* legacy (no usado en red) */
+#define MSG_KEY_ID   'P'       /* legacy (no usado en red) */
 #define MAX_PLAYERS  2
 #define MAX_TEXT_LEN 64
+#define NET_PORT     5000
+#define NET_HOST     "127.0.0.1"
 
 typedef enum {
     CMD_JOIN = 1,   /* jugador se quiere conectar */
@@ -35,15 +37,28 @@ typedef enum {
     EVT_OPP_MOVE       /* el rival usó movimiento (data1 = idx) */
 } EventType;
 
-// Mensaje ADMIN -> JUGADOR
-struct msg_event {
-    long mtype;                 // se envía al PID del jugador
-    int  player_id;             // id asignado (1..MAX_PLAYERS)
-    int  opponent_id;           // id del oponente, 0 si aun no hay
-    EventType evt;              // tipo de evento
-    int  connected;             // cuantos hay conectados
-    int  data1;                 // movimiento idx, etc.
-    char text[MAX_TEXT_LEN];    // nombre de pokemon, etc.
-};
+typedef enum {
+    PKT_CMD = 1,
+    PKT_EVT
+} PacketKind;
+
+// Paquete genérico sobre sockets (admin <-> jugadores)
+typedef struct net_packet {
+    int kind;                   // PKT_CMD o PKT_EVT
+    int code;                   // CommandType o EventType según kind
+    int player_id;              // id del emisor
+    int arg1;                   // datos adicionales
+    int arg2;
+    char text[MAX_TEXT_LEN];    // payload textual (nombre pkmn, etc.)
+} net_packet;
+
+typedef struct event_data {
+    EventType evt;
+    int player_id;
+    int opponent_id;
+    int connected;
+    int data1;
+    char text[MAX_TEXT_LEN];
+} event_data;
 
 #endif

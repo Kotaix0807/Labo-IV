@@ -1,181 +1,146 @@
 #include <sys/ipc.h>
-#include <sys/msg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/select.h>
 
 #include "ipc.h"
+#include "net.h"
 
 int main(void)
 {
     struct {
-        pid_t pid;
-        int   id;
+        int fd;
+        int id;
     } players[MAX_PLAYERS] = {0};
     int connected = 0;
 
-    key_t key = ftok(MSG_KEY_PATH, MSG_KEY_ID);
-    if (key == -1)
+    int lfd = net_listen(NET_PORT);
+    if (lfd < 0)
     {
-        perror("ftok");
-        exit(1);
+        perror("listen");
+        return 1;
     }
 
-    int qid = msgget(key, IPC_CREAT | IPC_EXCL | 0666);
-    if (qid == -1)
-    {
-        if (errno == EEXIST)
-        {
-            /* limpiar cola previa para evitar mensajes antiguos con tamaños distintos */
-            qid = msgget(key, 0666);
-            if (qid != -1)
-                msgctl(qid, IPC_RMID, NULL);
-            qid = msgget(key, IPC_CREAT | IPC_EXCL | 0666);
-        }
-        if (qid == -1)
-        {
-            perror("msgget");
-            exit(1);
-        }
-    }
-
-    printf("Admin: cola creada, qid=%d\n", qid);
-    printf("Admin: esperando a %d jugadores...\n", MAX_PLAYERS);
-
-    struct msg_command cmd;
-    struct msg_event ev;
+    printf("Admin: escuchando en puerto %d\n", NET_PORT);
 
     while (connected < MAX_PLAYERS)
     {
-        if (msgrcv(qid, &cmd, sizeof(cmd) - sizeof(long), 1, MSG_NOERROR) == -1)
+        int cfd = net_accept(lfd);
+        if (cfd < 0)
         {
-            perror("msgrcv");
-            exit(1);
+            perror("accept");
+            continue;
         }
+        players[connected].fd = cfd;
+        players[connected].id = connected + 1;
+        connected++;
+        printf("Admin: se conectó jugador %d (fd=%d)\n", players[connected - 1].id, cfd);
 
-        if (cmd.cmd == CMD_JOIN)
-        {
-            if (connected >= MAX_PLAYERS)
-                continue;
-
-            players[connected].pid = cmd.player_pid;
-            players[connected].id = connected + 1;
-            connected++;
-
-            printf("Admin: se conectó jugador_id=%d, PID=%d (total=%d)\n",
-                   players[connected - 1].id, players[connected - 1].pid, connected);
-
-            ev.mtype = players[connected - 1].pid;
-            ev.player_id = players[connected - 1].id;
-            ev.opponent_id = 0;
-            ev.evt = EVT_WAITING;
-            ev.connected = connected;
-            if (msgsnd(qid, &ev, sizeof(ev) - sizeof(long), 0) == -1)
-                perror("msgsnd EVT_WAITING");
-        }
+        net_packet wait_pkt = {0};
+        wait_pkt.kind = PKT_EVT;
+        wait_pkt.code = EVT_WAITING;
+        wait_pkt.player_id = players[connected - 1].id;
+        wait_pkt.arg1 = connected;
+        net_send_packet(cfd, &wait_pkt);
     }
 
-    printf("Admin: ya están los %d jugadores, empezamos el juego.\n", MAX_PLAYERS);
-
+    /* Enviar START a todos */
     for (int i = 0; i < MAX_PLAYERS; i++)
     {
-        int opponent_idx = (i + 1) % MAX_PLAYERS;
-        ev.mtype = players[i].pid;
-        ev.player_id = players[i].id;
-        ev.opponent_id = players[opponent_idx].id;
-        ev.evt = EVT_START;
-        ev.connected = connected;
-        if (msgsnd(qid, &ev, sizeof(ev) - sizeof(long), 0) == -1)
-            perror("msgsnd EVT_START");
+        int opp_idx = (i + 1) % MAX_PLAYERS;
+        net_packet start = {0};
+        start.kind = PKT_EVT;
+        start.code = EVT_START;
+        start.player_id = players[i].id;
+        start.arg1 = players[opp_idx].id; /* opponent id */
+        net_send_packet(players[i].fd, &start);
     }
 
     int exited = 0;
     while (exited < MAX_PLAYERS)
     {
-        if (msgrcv(qid, &cmd, sizeof(cmd) - sizeof(long), 1, MSG_NOERROR) == -1)
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        int maxfd = -1;
+        for (int i = 0; i < MAX_PLAYERS; i++)
         {
-            perror("msgrcv CMD_EXIT");
+            if (players[i].fd > 0)
+            {
+                FD_SET(players[i].fd, &rfds);
+                if (players[i].fd > maxfd)
+                    maxfd = players[i].fd;
+            }
+        }
+        if (maxfd < 0)
+            break;
+
+        int ready = select(maxfd + 1, &rfds, NULL, NULL, NULL);
+        if (ready <= 0)
+        {
+            if (errno == EINTR)
+                continue;
+            perror("select");
             break;
         }
 
-        if (cmd.cmd == CMD_EXIT)
+        for (int i = 0; i < MAX_PLAYERS; i++)
         {
-            exited++;
-            printf("Admin: jugador %d (PID=%d) salió (%d/%d)\n",
-                   cmd.player_id, cmd.player_pid, exited, MAX_PLAYERS);
-        }
-        else if (cmd.cmd == CMD_SELECT)
-        {
-            pid_t target = 0;
-            int opp_id = 0;
-            for (int i = 0; i < MAX_PLAYERS; i++)
+            if (players[i].fd > 0 && FD_ISSET(players[i].fd, &rfds))
             {
-                if (players[i].pid != 0 && players[i].pid != cmd.player_pid)
+                net_packet pkt;
+                if (net_recv_packet(players[i].fd, &pkt) != 0)
                 {
-                    target = players[i].pid;
-                    opp_id = players[i].id;
-                    break;
+                    printf("Admin: jugador %d desconectado\n", players[i].id);
+                    close(players[i].fd);
+                    players[i].fd = -1;
+                    exited++;
+                    continue;
                 }
-            }
-            if (target != 0)
-            {
-                ev.mtype = target;
-                ev.player_id = cmd.player_id;
-                ev.opponent_id = opp_id;
-                ev.evt = EVT_OPP_SELECT;
-                ev.connected = connected;
-                ev.data1 = 0;
-                strncpy(ev.text, cmd.text, sizeof(ev.text) - 1);
-                ev.text[sizeof(ev.text) - 1] = '\0';
-                if (msgsnd(qid, &ev, sizeof(ev) - sizeof(long), 0) == -1)
-                    perror("msgsnd EVT_OPP_SELECT");
-            }
-        }
-        else if (cmd.cmd == CMD_MOVE)
-        {
-            pid_t target = 0;
-            int opp_id = 0;
-            for (int i = 0; i < MAX_PLAYERS; i++)
-            {
-                if (players[i].pid != 0 && players[i].pid != cmd.player_pid)
+
+                if (pkt.kind != PKT_CMD)
+                    continue;
+
+                if (pkt.code == CMD_EXIT)
                 {
-                    target = players[i].pid;
-                    opp_id = players[i].id;
-                    break;
+                    exited++;
+                    printf("Admin: jugador %d salió (%d/%d)\n", pkt.player_id, exited, MAX_PLAYERS);
+                    close(players[i].fd);
+                    players[i].fd = -1;
                 }
-            }
-            if (target != 0)
-            {
-                ev.mtype = target;
-                ev.player_id = cmd.player_id;
-                ev.opponent_id = opp_id;
-                ev.evt = EVT_OPP_MOVE;
-                ev.connected = connected;
-                ev.data1 = cmd.arg1;
-                ev.text[0] = '\0';
-                if (msgsnd(qid, &ev, sizeof(ev) - sizeof(long), 0) == -1)
-                    perror("msgsnd EVT_OPP_MOVE");
+                else if (pkt.code == CMD_SELECT || pkt.code == CMD_MOVE)
+                {
+                    int target_idx = (i + 1) % MAX_PLAYERS;
+                    if (players[target_idx].fd > 0)
+                    {
+                        net_packet ev = {0};
+                        ev.kind = PKT_EVT;
+                        ev.code = (pkt.code == CMD_SELECT) ? EVT_OPP_SELECT : EVT_OPP_MOVE;
+                        ev.player_id = pkt.player_id;
+                        ev.arg1 = pkt.arg1;
+                        strncpy(ev.text, pkt.text, sizeof(ev.text) - 1);
+                        ev.text[sizeof(ev.text) - 1] = '\0';
+                        net_send_packet(players[target_idx].fd, &ev);
+                    }
+                }
             }
         }
     }
 
+    /* Notificar shutdown */
+    net_packet shut = {0};
+    shut.kind = PKT_EVT;
+    shut.code = EVT_SHUTDOWN;
     for (int i = 0; i < MAX_PLAYERS; i++)
     {
-        if (players[i].pid == 0)
-            continue;
-        ev.mtype = players[i].pid;
-        ev.player_id = 0;
-        ev.opponent_id = 0;
-        ev.evt = EVT_SHUTDOWN;
-        ev.connected = connected;
-        ev.data1 = 0;
-        ev.text[0] = '\0';
-        if (msgsnd(qid, &ev, sizeof(ev) - sizeof(long), 0) == -1)
-            perror("msgsnd EVT_SHUTDOWN");
+        if (players[i].fd > 0)
+        {
+            net_send_packet(players[i].fd, &shut);
+            close(players[i].fd);
+        }
     }
-
-    msgctl(qid, IPC_RMID, NULL);
+    close(lfd);
     return 0;
 }

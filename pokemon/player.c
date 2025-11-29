@@ -4,19 +4,19 @@
 #include <locale.h>
 #include <stdbool.h>
 #include <ncurses.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
+#include <sys/select.h>
 #include <string.h>
 #include "sound.h"
 #include "structs.h"
 #include "tools.h"
 #include "opt.h"
 #include "ipc.h"
+#include "net.h"
 
 #define WIN_X_MIN 216
 #define WIN_Y_MIN 45
 
-static int g_qid = -1;
+static int g_sock = -1;
 static int g_player_id = 0;
 static int g_opponent_id = 0;
 
@@ -63,49 +63,48 @@ static int initGame()
 
 static int send_command(CommandType cmd, int arg1, const char *text)
 {
-    if (g_qid == -1)
+    if (g_sock == -1)
         return 0;
 
-    struct msg_command msg = {0};
-    msg.mtype = 1;
-    msg.player_pid = getpid();
-    msg.player_id = g_player_id;
-    msg.cmd = cmd;
-    msg.arg1 = arg1;
-    msg.arg2 = 0;
+    net_packet pkt;
+    memset(&pkt, 0, sizeof(pkt));
+    pkt.kind = PKT_CMD;
+    pkt.code = cmd;
+    pkt.player_id = g_player_id;
+    pkt.arg1 = arg1;
     if (text)
     {
-        strncpy(msg.text, text, sizeof(msg.text) - 1);
-        msg.text[sizeof(msg.text) - 1] = '\0';
+        strncpy(pkt.text, text, sizeof(pkt.text) - 1);
+        pkt.text[sizeof(pkt.text) - 1] = '\0';
     }
 
-    if (msgsnd(g_qid, &msg, sizeof(msg) - sizeof(long), 0) == -1)
-    {
-        perror("msgsnd");
+    return net_send_packet(g_sock, &pkt) == 0;
+}
+
+static int recv_event(event_data *ev)
+{
+    if (g_sock == -1)
         return 0;
-    }
+
+    net_packet pkt;
+    if (net_recv_packet(g_sock, &pkt) != 0)
+        return 0;
+    if (pkt.kind != PKT_EVT)
+        return 0;
+
+    ev->evt = (EventType)pkt.code;
+    ev->player_id = pkt.player_id;
+    ev->opponent_id = pkt.arg1;
+    ev->connected = pkt.arg2;
+    ev->data1 = pkt.arg1;
+    strncpy(ev->text, pkt.text, sizeof(ev->text) - 1);
+    ev->text[sizeof(ev->text) - 1] = '\0';
     return 1;
 }
 
-static int recv_event(struct msg_event *ev)
+static int wait_for_events(const EventType *wanted, int n, event_data *out)
 {
-    if (g_qid == -1)
-        return 0;
-
-    while (1)
-    {
-        if (msgrcv(g_qid, ev, sizeof(*ev) - sizeof(long), getpid(), MSG_NOERROR) == -1)
-        {
-            perror("msgrcv");
-            return 0;
-        }
-        return 1;
-    }
-}
-
-static int wait_for_events(const EventType *wanted, int n, struct msg_event *out)
-{
-    struct msg_event ev;
+    event_data ev;
     while (recv_event(&ev))
     {
         if (ev.evt == EVT_SHUTDOWN)
@@ -124,25 +123,19 @@ static int wait_for_events(const EventType *wanted, int n, struct msg_event *out
 
 static int connect_to_admin(int *out_id)
 {
-    key_t key = ftok(MSG_KEY_PATH, MSG_KEY_ID);
-    if (key == -1)
+    int sock = net_connect(NET_HOST, NET_PORT);
+    if (sock < 0)
     {
-        perror("ftok");
+        perror("net_connect");
         return 0;
     }
 
-    int qid = msgget(key, 0666);
-    if (qid == -1)
-    {
-        perror("msgget");
-        return 0;
-    }
-
-    g_qid = qid;
+    g_sock = sock;
+    g_player_id = 0;
     if (!send_command(CMD_JOIN, 0, NULL))
         return 0;
 
-    struct msg_event ev;
+    event_data ev;
     EventType wanted[] = {EVT_WAITING, EVT_START};
     while (wait_for_events(wanted, 2, &ev))
     {
@@ -174,14 +167,11 @@ int main(void)
 
     while(mainMenu(&Player) != 3);
 
-    if (g_qid != -1)
+    if (g_sock != -1)
     {
-        struct msg_command leave = {0};
-        leave.mtype = 1;
-        leave.player_pid = getpid();
-        leave.player_id = player_id;
-        leave.cmd = CMD_EXIT;
-        msgsnd(g_qid, &leave, sizeof(leave) - sizeof(long), 0);
+        send_command(CMD_EXIT, 0, NULL);
+        net_close(g_sock);
+        g_sock = -1;
     }
 
     free(Player.name);
@@ -194,7 +184,7 @@ int main(void)
 static int wait_opponent_selection(char *name_out, size_t len)
 {
     EventType wanted[] = {EVT_OPP_SELECT};
-    struct msg_event ev;
+    event_data ev;
     if (!wait_for_events(wanted, 1, &ev))
         return 0;
     strncpy(name_out, ev.text, len - 1);
@@ -205,7 +195,7 @@ static int wait_opponent_selection(char *name_out, size_t len)
 static int wait_opponent_move(int *move_idx, int *attacker_id)
 {
     EventType wanted[] = {EVT_OPP_MOVE};
-    struct msg_event ev;
+    event_data ev;
     if (!wait_for_events(wanted, 1, &ev))
         return 0;
     *move_idx = ev.data1;
