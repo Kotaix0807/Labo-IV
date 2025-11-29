@@ -44,7 +44,7 @@ static int initGame()
     curs_set(0);
     noecho();
     cbreak();
-    //warn();
+   // warn();
     if(!initAudio())
     {
         endwin();
@@ -64,6 +64,7 @@ int main(void)
 
     while(mainMenu(&Player) != 3);
     free(Player.name);
+    echo();
     endwin();
     quitAudio();
     return 0;

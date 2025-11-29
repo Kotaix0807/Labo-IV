@@ -409,8 +409,10 @@ void previewWindow(int width, int height)
     int win_h = height + 2;
     int win_w = width + 2;
 
-    if (win_h > yM) win_h = yM;
-    if (win_w > xM) win_w = xM;
+    if (win_h > yM) 
+        win_h = yM;
+    if (win_w > xM) 
+        win_w = xM;
 
     int pos_y = (yM - win_h) / 2;
     int pos_x = (xM - win_w) / 2;
@@ -431,10 +433,18 @@ void previewWindow(int width, int height)
 
         switch (ch)
         {
-            case KEY_UP:    pos_y--; break;
-            case KEY_DOWN:  pos_y++; break;
-            case KEY_LEFT:  pos_x--; break;
-            case KEY_RIGHT: pos_x++; break;
+            case KEY_UP:    
+                pos_y--; 
+                break;
+            case KEY_DOWN:  
+                pos_y++; 
+                break;
+            case KEY_LEFT:  
+                pos_x--; 
+                break;
+            case KEY_RIGHT: 
+                pos_x++; 
+                break;
             case 'r':
                 mvprintw(yM - 1, 1, "Ventana en x = %d, y = %d", pos_x, pos_y);
                 clrtoeol();
@@ -444,13 +454,17 @@ void previewWindow(int width, int height)
                 break;
         }
 
-        /* límites para que no se salga de la pantalla */
-        if (pos_y < 0) pos_y = 0;
-        if (pos_x < 0) pos_x = 0;
-        if (pos_y > yM - win_h) pos_y = yM - win_h;
-        if (pos_x > xM - win_w) pos_x = xM - win_w;
+        if (pos_y < 0) 
+            pos_y = 0;
+        if (pos_x < 0) 
+            pos_x = 0;
 
-        /* limpiar la posición anterior antes de mover */
+        if (pos_y > yM - win_h) 
+            pos_y = yM - win_h;
+
+        if (pos_x > xM - win_w) 
+            pos_x = xM - win_w;
+
         wborder(win, ' ', ' ', ' ',' ',' ',' ',' ',' ');
         wrefresh(win);
         mvwin(win, pos_y, pos_x);
@@ -504,8 +518,8 @@ txt_box *TxtBox_file(const char *file, const char *title, int x, int y, int alig
 
 void initCustTxtBox(txt_box *t, char *txt[], int n ,const char *title, int x, int y, int w, int h, int align)
 {
-    //int yM, xM;
-    //getmaxyx(stdscr, yM, xM);
+    int yM, xM;
+    getmaxyx(stdscr, yM, xM);
 
     if (title) {
         t->title = title;
@@ -518,22 +532,33 @@ void initCustTxtBox(txt_box *t, char *txt[], int n ,const char *title, int x, in
     t->align = align;
     t->txt = txt;
 
-    int temp_w = largestStr(txt, n);
-    int temp_h = n;
-    if (w < temp_w)
-        w = temp_w;
-    if (h < temp_h)
-        h = temp_h;
+    int min_w = largestStr(txt, n);
+    int min_h = n;
+    if (w < min_w)
+        w = min_w;
+    if (h < min_h)
+        h = min_h;
+
+    int max_w = (xM > 2) ? xM - 2 : 1;
+    int max_h = (yM > 2) ? yM - 2 : 1;
+    if (w > max_w)
+        w = max_w;
+    if (h > max_h)
+        h = max_h;
 
     t->w = w;
     t->h = h;
     t->owns_txt = 0;
 
+    /* ajustar posicion para que la ventana completa quede dentro de la pantalla */
     if (x < 0)
         x = 0;
-
     if (y < 0)
         y = 0;
+    if (x > xM - (t->w + 2))
+        x = xM - (t->w + 2);
+    if (y > yM - (t->h + 2))
+        y = yM - (t->h + 2);
 
     t->win = newwin(t->h + 2, t->w + 2, y, x);
     keypad(t->win, TRUE);
@@ -542,10 +567,15 @@ void initCustTxtBox(txt_box *t, char *txt[], int n ,const char *title, int x, in
 void custPrintBox(txt_box *t, int n)
 {
     box(t->win, 0, 0);
-    for (int i = 0; i < n; i++)
+    int lines;
+    if (n < t->h)
+        lines = n;
+    else
+        lines = t->h;
+    for (int i = 0; i < lines; i++)
     {
-        //int len = (int)strlen(t->txt[i]);
-        int start = 1;//txt_align_start(t, len);
+        int len = (int)strlen(t->txt[i]);
+        int start = txt_align_start(t, len);
         mvwprintw(t->win, i + 1, start, "%s", t->txt[i]);
     }
     if(t->title != NULL)
@@ -558,16 +588,49 @@ txt_box *custTxtBox_str(char *txt[], int n, const char *title, int x, int y, int
     txt_box *blob = malloc(sizeof(txt_box));
     int xM, yM;
     getmaxyx(stdscr, yM, xM);
-    if(x < 0 || x > xM || y < 0 || y > yM)
-    {
-        int box_w = largestStr(txt, n) + 2;
-        int box_h = n + 2;
-        int x_ = (xM - box_w) / 2;
-        int y_ = (yM - box_h) / 2;
-        initCustTxtBox(blob, txt, n, title, x_, y_, w, h, align);
-    }
+
+    int min_w = largestStr(txt, n);
+    int min_h = n;
+    int final_w;
+    if (w < min_w)
+        final_w = min_w;
     else
-        initCustTxtBox(blob, txt, n, title, x, y, w, h, align);
+        final_w = w;
+    int final_h;
+    if (h < min_h)
+        final_h = min_h;
+    else
+        final_h = h;
+
+    int max_w;
+    if (xM > 2)
+        max_w = xM - 2;
+    else
+        max_w = 1;
+
+    int max_h;
+    if (yM > 2)
+        max_h = yM - 2;
+    else
+        max_h = 1;
+    if (final_w > max_w)
+        final_w = max_w;
+    if (final_h > max_h)
+        final_h = max_h;
+
+    /* recalcular posicion para que no se salga de pantalla */
+    int pos_x = x;
+    int pos_y = y;
+    if (pos_x < 0)
+        pos_x = 0;
+    if (pos_y < 0)
+        pos_y = 0;
+    if (pos_x > xM - (final_w + 2))
+        pos_x = xM - (final_w + 2);
+    if (pos_y > yM - (final_h + 2))
+        pos_y = yM - (final_h + 2);
+
+    initCustTxtBox(blob, txt, n, title, pos_x, pos_y, final_w, final_h, align);
     custPrintBox(blob, n);
     return blob;
 }
@@ -593,7 +656,5 @@ txt_box *custTxtBox_file(const char *file, const char *title, int x, int y, int 
     printBox(blob);
     return blob;
 }
-
-
 
 #endif

@@ -7,6 +7,40 @@
 #include <ncurses.h>
 #include "tools.h"
 
+#define FIRE 0
+#define WATER 1
+#define LEAF 2
+
+/*
+VENOSAUR:
+-Giga Drain
+-Sludge Bomb
+-Earthquake
+-Sleep Powder
+
+CHARIZARD:
+-Flamethrower
+-Air Slash
+-Dragon Pulse
+-Roost
+
+BLASTOISE:
+-Surf
+-Ice Beam
+-Dark Pulse
+-Rapid Spin
+
+*/
+
+
+/*
+typedef struct move_{
+    char *name;
+    int type;
+    unsigned int power;
+}move;
+*/
+
 typedef struct pokemon_{
     char *name;
     char *move_set[4];
@@ -53,10 +87,10 @@ void pkmnSet(ply *curr, char *name)
         curr->monster->ascii = readText("art/venosaur.txt");
         curr->monster->n_ascii = fileLines("art/venosaur.txt", 0);
         const char *moves[] = {
-            "Movimiento_1",
-            "Movimiento_2",
-            "Movimiento_3",
-            "Movimiento_4"
+            "Giga Drain",
+            "Sludge Bomb",
+            "Earthquake",
+            "Sleep Powder"
         };
         for (int i = 0; i < 4; i++)
             curr->monster->move_set[i] = (char *)moves[i];
@@ -70,10 +104,10 @@ void pkmnSet(ply *curr, char *name)
         curr->monster->ascii = readText("art/charizard.txt");
         curr->monster->n_ascii = fileLines("art/charizard.txt", 0);
         const char *moves[] = {
-            "Movimiento_1",
-            "Movimiento_2",
-            "Movimiento_3",
-            "Movimiento_4"
+            "Flamethrower",
+            "Air Slash",
+            "Dragon Pulse",
+            "Roost"
         };
         for (int i = 0; i < 4; i++)
             curr->monster->move_set[i] = (char *)moves[i];
@@ -87,10 +121,10 @@ void pkmnSet(ply *curr, char *name)
         curr->monster->ascii = readText("art/blastoise.txt");
         curr->monster->n_ascii = fileLines("art/blastoise.txt", 0);
         const char *moves[] = {
-            "Movimiento_1",
-            "Movimiento_2",
-            "Movimiento_3",
-            "Movimiento_4"
+            "Surf",
+            "Ice Beam",
+            "Dark Pulse",
+            "Rapid Spin"
         };
         for (int i = 0; i < 4; i++)
             curr->monster->move_set[i] = (char *)moves[i];
@@ -228,10 +262,10 @@ WINDOW *printPkmnW(pkmn *monster, int x, int y)
         win_x = x;
 
     WINDOW *win = newwin(win_h, win_w, win_y, win_x);
-    box(win, 0, 0);
+    //box(win, 0, 0);
     for(int i = 0; i < h; i++)
         mvwprintw(win, i + 1, 1, "%s", monster->ascii[i]);
-    mvwprintw(win, 0, 2, "[%s]", monster->name);
+    mvwprintw(win, 0, 2, "[%s]/[HP: %d]", monster->name, monster->hp);
     wrefresh(win);
     return win;
 

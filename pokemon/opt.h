@@ -11,13 +11,13 @@ void printTitle();
 void credits();
 void askPkmn(ply *cur);
 void preview();
-void render_combat_scene(ply *cur);
+void Combat(ply *cur);
 
 int mainMenu(ply *Player)
 {
     //printTitle();
     char *choices[] = {
-        "Render Scene", //Local
+        "Combat", //Local
         "Ventana", //Cambiar Nombre
         "Creditos", //Creditos
         "Salir" //Salir
@@ -27,7 +27,7 @@ int mainMenu(ply *Player)
     {
         case 0:
             askPkmn(Player);
-            render_combat_scene(Player);
+            Combat(Player);
             break;
         case 1:
             //askName(Player);
@@ -91,13 +91,6 @@ void printTitle()
 
     int rows = (int)(sizeof(lines) / sizeof(char *));
     int length = largestStr(lines, rows);
-    if (xMax < length + 50)
-    {
-        char *title = "Pokemon";
-        mvwprintw(stdscr, 0, (xMax - (int)strlen(title)) / 2, "%s", title);
-        wrefresh(stdscr);
-        return;
-    }
     for(int i = 0; i < rows; i++)
         mvwprintw(stdscr, i, ((xMax / 2) - length / 2), "%s", lines[i]);
     wrefresh(stdscr);
@@ -109,7 +102,7 @@ void credits()
     wclear(stdscr);
     wrefresh(stdscr);
 
-    char *txt[] = {
+    char *credits[] = {
         "Alguien lee los creditos?",
         "Creado por:",
         "-Eloy Quezada",
@@ -121,8 +114,7 @@ void credits()
         "Universidad de Magallanes 2025"
     };
 
-    int rows = (int)(sizeof(txt) / sizeof(char *));
-    dialFromStr(txt, rows, "Creditos", 0, 0, ALIGN_CENTER);
+    dialFromStr(credits, (int)(sizeof(credits)/sizeof(char *)), "Creditos", -1, -1, ALIGN_CENTER);
 }
 
 void askPkmn(ply *cur)
@@ -144,8 +136,7 @@ void preview()
     previewWindow(w, h);
 }
 
-
-void render_combat_scene(ply *cur)
+void Combat(ply *cur)
 {
     wclear(stdscr);
     wrefresh(stdscr);
@@ -174,63 +165,69 @@ void render_combat_scene(ply *cur)
     enemy->speed = 50;
     enemy->hp = 100;
     enemy->w = largestStr_bra(enemy->ascii, enemy->n_ascii);
-    WINDOW *player_win = printPkmnW(cur->monster, 45, 15);
-    WINDOW *enemy_win = printPkmnW(enemy, (xM - enemy->w - 2), 0);
 
-    char *dialogue[] = {
-        "Vamos %s!, yo te elijo!"
+
+    while(1)
+    {
+        WINDOW *player_win = printPkmnW(cur->monster, 45, 15);
+        WINDOW *enemy_win = printPkmnW(enemy, (xM - enemy->w - 2), 0);
+        char *init[] = {
+            "Jugador: %s",
+            "Tu oponente es: %s"
+        };
+        replace_fmt(init, 0, cur->name);
+        replace_fmt(init, 1, enemy->name);
+        int init_lines = (int)(sizeof(init)/sizeof(char*));
+        int init_h = 10 - init_lines;
+        txt_box *combat_box = custTxtBox_str(init, init_lines, NULL, 1, (yM - init_h - 2), 40, init_h, ALIGN_CENTER);
+        int mv = menu("Que deseas hacer?", cur->monster->move_set, 4, 1, (yM - 6));
+        delBox(combat_box);
+
+        char *used[] = {
+            "%s uso:",
+            "%s!"
+        };
+        replace_fmt(used, 0, cur->monster->name);
+        replace_fmt(used, 1, cur->monster->move_set[mv]);
+        int used_lines = (int)(sizeof(used)/sizeof(char*));
+        int used_h = 10 - used_lines;
+        txt_box *use = custTxtBox_str(used, used_lines, NULL, 1, (yM - used_h - 2), 40, used_h, ALIGN_CENTER);
+        napms(1000);
+        flushinp(); /* descartar teclas pulsadas durante la pausa */
+        delBox(use);
+        enemy->hp -= cur->monster->attack;
+        if(enemy->hp <= 0)
+        {
+            int l = enemy->n_ascii;
+            for(int i = 0; i < l; i++)
+            {
+                if(enemy->n_ascii > 0)
+                    enemy->n_ascii--;
+                printPkmnW(enemy, (xM - enemy->w - 2), 0);
+                napms(45);
+                flushinp();
+            }
+            clearWin(enemy_win);
+            clearWin(player_win);
+            break;
+        }
+        printPkmnW(enemy, (xM - enemy->w - 2), 0);
+
+
+        printw("Movimiento enemigo");
+        refresh();
+        getch();
+        clrtoeol();
+        refresh();
+
+        clearWin(enemy_win);
+        clearWin(player_win);
+    }
+    char *end[] = {
+        "Felicidades %s!",
+        "Haz ganado el combate pokémon"
     };
-    int n = (int)(sizeof(dialogue) / sizeof(char *));
-    int h = 10 - n;
-    replace_fmt(dialogue, 0, cur->monster->name);
-    //dialFromStr(dialogue, h, "Dialogo", 1, (yM - h - 2), ALIGN_LEFT);
-    txt_box *combat_box = custTxtBox_str(dialogue, n, "Dialogo", 1, (yM - h - 2), 30, h, 0);
-
-    menu("Que deseas hacer?", cur->monster->move_set, 4, 1, (yM - 6));
-    delBox(combat_box);
-
-//xMax - win_w
-    /*
-    int enemy_w = largestStr_bra(enemy->ascii, enemy->n_ascii);
-    int enemy_h = enemy->n_ascii + 2;
-
-    int player_w = largestStr_bra(cur->monster->ascii, cur->monster->n_ascii);
-    int player_h = cur->monster->n_ascii + 2;
-
-    int enemy_x = xM - enemy_w - 2;
-    if (enemy_x < 0)
-        enemy_x = 0;
-    int enemy_y = 1;
-
-    int player_x = 2;
-    int player_y = yM - player_h - 2;
-    if (player_y < 0)
-        player_y = 0;
-
-    WINDOW *enemy_win = newwin(enemy_h, enemy_w, enemy_y, enemy_x);
-    box(enemy_win, 0, 0);
-    mvwprintw(enemy_win, 0, 2, " %s ", enemy->name);
-    for (int i = 0; i < enemy->n_ascii; i++)
-        mvwprintw(enemy_win, i + 1, 1, "%s", enemy->ascii[i]);
-    wrefresh(enemy_win);
-
-    WINDOW *player_win = newwin(player_h, player_w, player_y, player_x);
-    box(player_win, 0, 0);
-    mvwprintw(player_win, 0, 2, " %s ", cur->monster->name);
-    for (int i = 0; i < cur->monster->n_ascii; i++)
-        mvwprintw(player_win, i + 1, 1, "%s", cur->monster->ascii[i]);
-    wrefresh(player_win);
-
-    mvprintw(yM - 1, 2, "Presiona ENTER o 'q' para volver al menu");
-    refresh();
-
-    int ch;
-    while ((ch = getch()) != '\n' && ch != 'q');
-    */
-    /* limpiar y liberar recursos */
-
-    clearWin(enemy_win);
-    clearWin(player_win);
+    dialFromStr(end, 2, "Winner!", -1, -1, ALIGN_CENTER);
 
     if (enemy->ascii)
     {
