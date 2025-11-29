@@ -9,7 +9,7 @@
 #define MAX_PLAYERS  2
 #define MAX_TEXT_LEN 64
 #define NET_PORT     5000
-#define NET_HOST     "127.0.0.1"
+#define NET_HOST     "100.100.40.46"
 
 typedef enum {
     CMD_JOIN = 1,   /* jugador se quiere conectar */

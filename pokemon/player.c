@@ -20,6 +20,26 @@ static int g_sock = -1;
 static int g_player_id = 0;
 static int g_opponent_id = 0;
 
+static int read_port(void)
+{
+    const char *env = getenv("PKMN_PORT");
+    if (env && env[0] != '\0')
+    {
+        int p = atoi(env);
+        if (p > 0 && p < 65536)
+            return p;
+    }
+    return NET_PORT;
+}
+
+static const char *read_host(void)
+{
+    const char *env = getenv("PKMN_HOST");
+    if (env && env[0] != '\0')
+        return env;
+    return NET_HOST;
+}
+
 void warn()
 {
     const char *warn_msg = "Por favor, maximice su pantalla y presione 'ctrl -'";
@@ -123,7 +143,9 @@ static int wait_for_events(const EventType *wanted, int n, event_data *out)
 
 static int connect_to_admin(int *out_id)
 {
-    int sock = net_connect(NET_HOST, NET_PORT);
+    const char *host = read_host();
+    int port = read_port();
+    int sock = net_connect(host, port);
     if (sock < 0)
     {
         perror("net_connect");
