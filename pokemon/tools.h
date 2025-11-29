@@ -202,3 +202,5 @@ int replace_fmt(char **arr, int idx, const char *arg)
     return 0;
 }
 #endif /* TOOLS_H */
+
+//damage

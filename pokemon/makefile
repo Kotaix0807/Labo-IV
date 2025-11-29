@@ -2,7 +2,9 @@ CC := gcc
 CFLAGS := -g -Wall -Wextra -Werror 
 NO_ERROS := -g -Wall -Wextra
 BIN := battle
-SRC := main.c
+SRC := player.c
+ADMIN_BIN := admin
+ADMIN_SRC := admin.c
 SRC_TEST := test.c
 C_LDLIBS := -lm -lncursesw -lSDL2 -lSDL2_mixer
 CLEAR_SCREEN := printf '\033c'
@@ -13,7 +15,7 @@ VALGRIND := valgrind $(VALGRIND_FLAGS)
 VALGRIND_FREE_FLAGS := valgrind --leak-check=full --show-leak-kinds=definite
 VALGRIND_FREE := valgrind $(VALGRIND_FREE_FLAGS)
 
-.PHONY: build run leaks leak free test clean
+.PHONY: build run leaks leak free test clean admin
 
 build:
 	$(CLEAR_SCREEN) && $(CC) $(CFLAGS) -o $(BIN) $(SRC) $(C_LDLIBS)
@@ -40,3 +42,6 @@ test:
 
 clean:
 	$(RM) $(BIN)
+
+admin: $(ADMIN_SRC)
+	$(CC) $(CFLAGS) -o $(ADMIN_BIN) $(ADMIN_SRC)
