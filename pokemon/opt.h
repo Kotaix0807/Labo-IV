@@ -15,10 +15,10 @@ void Combat(ply *cur);
 
 int mainMenu(ply *Player)
 {
-    //printTitle();
+    printTitle();
     char *choices[] = {
-        "Combat", //Local
-        "Ventana", //Cambiar Nombre
+        "Combate", //Local
+        "Cambiar Nombre", //Cambiar Nombre
         "Creditos", //Creditos
         "Salir" //Salir
     };
@@ -26,12 +26,14 @@ int mainMenu(ply *Player)
     switch(selection)
     {
         case 0:
+            if(!Player->name)
+                askName(Player);
             askPkmn(Player);
             Combat(Player);
             break;
         case 1:
-            //askName(Player);
-            preview();
+            askName(Player);
+            //preview();
             break;
         case 2:
             credits();
@@ -125,7 +127,7 @@ void askPkmn(ply *cur)
         "Charizard"
     };
     int pkmn = menu("Elige tu pokemon", pklist, sizeof(pklist)/sizeof(char*), -1, -1);
-    pkmnSet(cur, pklist[pkmn]);
+    pkmnSet(&cur->monster, pklist[pkmn]);
 }
 
 
@@ -145,27 +147,9 @@ void Combat(ply *cur)
     getmaxyx(stdscr, yM, xM);
 
    //Por ahora se queda asi hasta que se incluya la comunicacion de procesos
-    pkmn *enemy = malloc(sizeof(pkmn));
-    if(!enemy)
-        return;
-    enemy->name = "Charizard";
-    enemy->ascii = readText("art/charizard.txt");
-    enemy->n_ascii = (int)fileLines("art/charizard.txt", 0);
-
-    const char *moves_enemy[] = {
-        "Movimiento_1",
-        "Movimiento_2",
-        "Movimiento_3",
-        "Movimiento_4"
-    };
-    for (int i = 0; i < 4; i++)
-        enemy->move_set[i] = (char *)moves_enemy[i];
-    enemy->attack = 50;
-    enemy->defense = 50;
-    enemy->speed = 50;
-    enemy->hp = 100;
-    enemy->w = largestStr_bra(enemy->ascii, enemy->n_ascii);
-
+    pkmn *enemy = NULL;
+    pkmnSet(&enemy, "Charizard");
+    int l = enemy->n_ascii;
 
     while(1)
     {
@@ -198,7 +182,6 @@ void Combat(ply *cur)
         enemy->hp -= cur->monster->attack;
         if(enemy->hp <= 0)
         {
-            int l = enemy->n_ascii;
             for(int i = 0; i < l; i++)
             {
                 if(enemy->n_ascii > 0)
@@ -225,13 +208,14 @@ void Combat(ply *cur)
     }
     char *end[] = {
         "Felicidades %s!",
-        "Haz ganado el combate pokémon"
+        "Haz ganado el combate pokemon"
     };
+    replace_fmt(end, 0, cur->name);
     dialFromStr(end, 2, "Winner!", -1, -1, ALIGN_CENTER);
 
     if (enemy->ascii)
     {
-        for (int i = 0; i < enemy->n_ascii; i++)
+        for (int i = 0; i < l; i++)
             free(enemy->ascii[i]);
         free(enemy->ascii);
     }

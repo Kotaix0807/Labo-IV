@@ -59,7 +59,7 @@ typedef struct player_{
 }ply;
 
 ply initPly();
-void pkmnSet(ply *curr, char *name);
+void pkmnSet(pkmn **monster, const char *name);
 void printPkmn(pkmn *monster, int x, int y);
 WINDOW *movePkmnWindow(pkmn *monster);
 WINDOW *printPkmnW(pkmn *monster, int x, int y);
@@ -78,14 +78,31 @@ ply initPly()
     return current;
 }
 
-void pkmnSet(ply *curr, char *name)
+void pkmnSet(pkmn **monster, const char *name)
 {
-    curr->monster = malloc(sizeof(pkmn));
-    curr->monster->name = name;
+    if (!monster || !name)
+        return;
+
+    if (*monster)
+    {
+        if ((*monster)->ascii)
+        {
+            for (int i = 0; i < (*monster)->n_ascii; i++)
+                free((*monster)->ascii[i]);
+            free((*monster)->ascii);
+        }
+        free(*monster);
+    }
+
+    pkmn *m = calloc(1, sizeof(pkmn));
+    if (!m)
+        return;
+
+    m->name = (char *)name;
     if(!strcmp(name, "Venosaur"))
     {
-        curr->monster->ascii = readText("art/venosaur.txt");
-        curr->monster->n_ascii = fileLines("art/venosaur.txt", 0);
+        m->ascii = readText("art/venosaur.txt");
+        m->n_ascii = fileLines("art/venosaur.txt", 0);
         const char *moves[] = {
             "Giga Drain",
             "Sludge Bomb",
@@ -93,16 +110,16 @@ void pkmnSet(ply *curr, char *name)
             "Sleep Powder"
         };
         for (int i = 0; i < 4; i++)
-            curr->monster->move_set[i] = (char *)moves[i];
-        curr->monster->attack = 50;
-        curr->monster->defense = 50;
-        curr->monster->speed = 50;
-        curr->monster->hp = 100;
+            m->move_set[i] = (char *)moves[i];
+        m->attack = 50;
+        m->defense = 50;
+        m->speed = 50;
+        m->hp = 100;
     }
     else if(!strcmp(name, "Charizard"))
     {
-        curr->monster->ascii = readText("art/charizard.txt");
-        curr->monster->n_ascii = fileLines("art/charizard.txt", 0);
+        m->ascii = readText("art/charizard.txt");
+        m->n_ascii = fileLines("art/charizard.txt", 0);
         const char *moves[] = {
             "Flamethrower",
             "Air Slash",
@@ -110,16 +127,16 @@ void pkmnSet(ply *curr, char *name)
             "Roost"
         };
         for (int i = 0; i < 4; i++)
-            curr->monster->move_set[i] = (char *)moves[i];
-        curr->monster->attack = 50;
-        curr->monster->defense = 50;
-        curr->monster->speed = 50;
-        curr->monster->hp = 100;
+            m->move_set[i] = (char *)moves[i];
+        m->attack = 50;
+        m->defense = 50;
+        m->speed = 50;
+        m->hp = 100;
     }
     else if(!strcmp(name, "Blastoise"))
     {
-        curr->monster->ascii = readText("art/blastoise.txt");
-        curr->monster->n_ascii = fileLines("art/blastoise.txt", 0);
+        m->ascii = readText("art/blastoise.txt");
+        m->n_ascii = fileLines("art/blastoise.txt", 0);
         const char *moves[] = {
             "Surf",
             "Ice Beam",
@@ -127,13 +144,14 @@ void pkmnSet(ply *curr, char *name)
             "Rapid Spin"
         };
         for (int i = 0; i < 4; i++)
-            curr->monster->move_set[i] = (char *)moves[i];
-        curr->monster->attack = 50;
-        curr->monster->defense = 50;
-        curr->monster->speed = 50;
-        curr->monster->hp = 100;
+            m->move_set[i] = (char *)moves[i];
+        m->attack = 50;
+        m->defense = 50;
+        m->speed = 50;
+        m->hp = 100;
     }
-    curr->monster->w = largestStr_bra(curr->monster->ascii, curr->monster->n_ascii);
+    m->w = largestStr_bra(m->ascii, m->n_ascii);
+    *monster = m;
 }
 
 void printPkmn(pkmn *monster, int x, int y)
