@@ -539,8 +539,17 @@ void initCustTxtBox(txt_box *t, char *txt[], int n ,const char *title, int x, in
     if (h < min_h)
         h = min_h;
 
-    int max_w = (xM > 2) ? xM - 2 : 1;
-    int max_h = (yM > 2) ? yM - 2 : 1;
+    int max_w;
+    if (xM > 2)
+        max_w = xM - 2;
+    else
+        max_w = 1;
+
+    int max_h;
+    if (yM > 2)
+        max_h = yM - 2;
+    else
+        max_h = 1;
     if (w > max_w)
         w = max_w;
     if (h > max_h)

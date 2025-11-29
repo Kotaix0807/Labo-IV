@@ -59,10 +59,9 @@ int main(void)
         return 1;
     printTitle();
     ply Player = initPly();
-    //askName(&Player);
-
 
     while(mainMenu(&Player) != 3);
+    
     free(Player.name);
     echo();
     endwin();

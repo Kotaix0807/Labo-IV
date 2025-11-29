@@ -127,7 +127,11 @@ uint32_t mirror_braille_cell(uint32_t cp) {
 void mirror_line_utf8(const char *line_in, char *line_out, size_t out_cap) {
     size_t len = strlen(line_in);
     int has_nl = (len > 0 && line_in[len - 1] == '\n');
-    size_t text_len = has_nl ? (len - 1) : len;
+    size_t text_len;
+    if (has_nl)
+        text_len = (len - 1);
+    else
+        text_len = len;
 
     uint32_t cps[MAX_LINE];  /* code points */
     size_t n_cps = utf8_decode_line(line_in, text_len, cps, MAX_LINE);

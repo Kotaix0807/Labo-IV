@@ -4,6 +4,8 @@
 #include "tools.h"
 #include "box.h"
 #include "structs.h"
+#include <time.h>
+#include <stdlib.h>
 
 int mainMenu(ply *Player);
 int askName(ply *Player);
@@ -130,7 +132,6 @@ void askPkmn(ply *cur)
     pkmnSet(&cur->monster, pklist[pkmn]);
 }
 
-
 void preview()
 {
     int h = atoi(Ask("Alto de la ventana:", 3));
@@ -140,16 +141,20 @@ void preview()
 
 void Combat(ply *cur)
 {
+    srand(time(NULL));
     wclear(stdscr);
     wrefresh(stdscr);
 
     int xM, yM;
     getmaxyx(stdscr, yM, xM);
 
+    key_t llave = (key_t)atoi(Ask("Ingrese la clave", 4));
+
    //Por ahora se queda asi hasta que se incluya la comunicacion de procesos
     pkmn *enemy = NULL;
     pkmnSet(&enemy, "Charizard");
-    int l = enemy->n_ascii;
+    int enemy_h = enemy->n_ascii;
+    //int player_h = cur->monster->n_ascii;
 
     while(1)
     {
@@ -164,7 +169,10 @@ void Combat(ply *cur)
         int init_lines = (int)(sizeof(init)/sizeof(char*));
         int init_h = 10 - init_lines;
         txt_box *combat_box = custTxtBox_str(init, init_lines, NULL, 1, (yM - init_h - 2), 40, init_h, ALIGN_CENTER);
-        int mv = menu("Que deseas hacer?", cur->monster->move_set, 4, 1, (yM - 6));
+        char *move_names[4];
+        for (int i = 0; i < 4; i++)
+            move_names[i] = cur->monster->move_set[i].name;
+        int mv = menu("Que deseas hacer?", move_names, 4, 1, (yM - 6));
         delBox(combat_box);
 
         char *used[] = {
@@ -172,17 +180,20 @@ void Combat(ply *cur)
             "%s!"
         };
         replace_fmt(used, 0, cur->monster->name);
-        replace_fmt(used, 1, cur->monster->move_set[mv]);
+        replace_fmt(used, 1, cur->monster->move_set[mv].name);
         int used_lines = (int)(sizeof(used)/sizeof(char*));
         int used_h = 10 - used_lines;
         txt_box *use = custTxtBox_str(used, used_lines, NULL, 1, (yM - used_h - 2), 40, used_h, ALIGN_CENTER);
         napms(1000);
         flushinp(); /* descartar teclas pulsadas durante la pausa */
         delBox(use);
-        enemy->hp -= cur->monster->attack;
-        if(enemy->hp <= 0)
+        int damage = formula(*(cur->monster), cur->monster->move_set[mv], *enemy);
+        if(enemy->hp > damage)
+            enemy->hp -= damage;
+        else
         {
-            for(int i = 0; i < l; i++)
+            enemy->hp = 0;
+            for(int i = 0; i < enemy_h; i++)
             {
                 if(enemy->n_ascii > 0)
                     enemy->n_ascii--;
@@ -195,14 +206,39 @@ void Combat(ply *cur)
             break;
         }
         printPkmnW(enemy, (xM - enemy->w - 2), 0);
+        /**
+        txt_box *use = custTxtBox_str(used, used_lines, NULL, 1, (yM - used_h - 2), 40, used_h, ALIGN_CENTER);
 
+        for (int i = 0; i < 4; i++)
+            free(move_names[i]);
+        free(move_names);
 
-        printw("Movimiento enemigo");
-        refresh();
-        getch();
-        clrtoeol();
-        refresh();
+        for (int i = 0; i < 4; i++)
+            move_names[i] = enemy->move_set[i].name;
+        mv = rand() % 3;
+        replace_fmt(used, 0, enemy->name);
+        replace_fmt(used, 1, enemy->move_set[mv].name);
+        napms(1000);
+        int damage = formula(*enemy, enemy->move_set[mv], *(cur->monster));
+        if(cur->monster->hp > damage)
+            cur->monster->hp -= damage;
+        else
+        {
+            cur->monster->hp = 0;
+            for(int i = 0; i < player_h; i++)
+            {
+                if(cur->monster->n_ascii > 0)
+                    cur->monster->n_ascii--;
+                printPkmnW(cur->monster, (xM - cur->monster->w - 2), 0);
+                napms(45);
+                flushinp();
+            }
+            clearWin(enemy_win);
+            clearWin(player_win);
+            break;
+        }
 
+        */
         clearWin(enemy_win);
         clearWin(player_win);
     }
@@ -215,7 +251,7 @@ void Combat(ply *cur)
 
     if (enemy->ascii)
     {
-        for (int i = 0; i < l; i++)
+        for (int i = 0; i < enemy_h; i++)
             free(enemy->ascii[i]);
         free(enemy->ascii);
     }
