@@ -56,8 +56,8 @@ void dialFromStr(char *txt[], int n, const char *title, int x, int y, int align)
 
 void previewWindow(int width, int height);
 
-txt_box *TxtBox_str(char *txt[], int n, const char *title, int x, int y, int align, int center);
-txt_box *TxtBox_file(const char *file, const char *title, int x, int y, int align, int center);
+txt_box *txtBox_str(char *txt[], int n, const char *title, int x, int y, int align);
+txt_box *txtBox_file(const char *file, const char *title, int x, int y, int align);
 
 void initCustTxtBox(txt_box *t, char *txt[], int n ,const char *title, int x, int y, int w, int h, int align);
 txt_box *custTxtBox_str(char *txt[], int n, const char *title, int x, int y, int w, int h, int align);

@@ -90,8 +90,18 @@ int recive_pkmn()
         }
         if (info.player_cmd == CMD_EXIT)
         {
-            printf("Jugador '%d' se fue... Abortando...\n", info.player_id);
-            return 0;
+            printf("Jugador '%d' se fue...\n", info.player_id);
+            msg_data message = {0};
+
+            printf("Esperando jugador...\n");
+            if (msgrcv(msgid, &message, sizeof(message) - sizeof(message.mtype), ADMIN, 0) == -1)
+            {
+                perror("msgrcv");
+                msgctl(msgid, IPC_RMID, NULL);
+                return 0;
+            }
+            if(message.player_cmd == CMD_JOIN)
+                printf("Jugador '%d' se unio!\n", message.player_id);
         }
         int idx = -1;
         for (int i = 0; i < MAX_PLAYERS; i++)

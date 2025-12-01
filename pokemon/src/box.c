@@ -1,5 +1,6 @@
 #include "box.h"
 #include "tools.h"
+#include <ncurses.h>
 
 /**
  * @brief Inicializa un menu de opciones
@@ -411,40 +412,38 @@ void previewWindow(int width, int height)
 }
 
 
-txt_box *TxtBox_str(char *txt[], int n, const char *title, int x, int y, int align, int center)
+txt_box *txtBox_str(char *txt[], int n, const char *title, int x, int y, int align)
 {
     txt_box *blob = malloc(sizeof(txt_box));
-    if(center)
+    int box_w = largestStr(txt, n) + 2;
+    int box_h = n + 2;
+    int yM, xM;
+    getmaxyx(stdscr, yM, xM);
+    if(x < 0 || y < 0 || x > xM || y > yM)
     {
-        int box_w = largestStr(txt, n) + 2;
-        int box_h = n + 2;
-        int x_ = (getmaxx(stdscr) - box_w) / 2;
-        int y_ = (getmaxy(stdscr) - box_h) / 2;
-        initTxtBox(blob, txt, n, title, x_, y_, align);
+        x = (xM - box_w) / 2;
+        y = (yM - box_h) / 2;
     }
-    else
-        initTxtBox(blob, txt, n, title, x, y, align);
+    initTxtBox(blob, txt, n, title, x, y, align);
     printBox(blob);
     return blob;
 }
 
-txt_box *TxtBox_file(const char *file, const char *title, int x, int y, int align, int center)
+txt_box *txtBox_file(const char *file, const char *title, int x, int y, int align)
 {
     txt_box *blob = malloc(sizeof(txt_box));
-    if(center)
+    int rows = fileLines(file, 0);
+    char **txt = readText(file);
+    int box_w = largestStr(txt, rows) + 2;
+    int box_h = rows + 2;
+    int yM, xM;
+    getmaxyx(stdscr, yM, xM);
+    if(x < 0 || y < 0 || x > xM || y > yM)
     {
-        int box_w = (int)fileLines(file, 1) + 2;
-        int box_h = (int)fileLines(file, 0) + 2;
-        int x_ = (getmaxx(stdscr) - box_w) / 2;
-        int y_ = (getmaxy(stdscr) - box_h) / 2;
-        initTxtBox(blob, readText(file), (int)fileLines(file, 0), title, x_, y_, align);
-        blob->owns_txt = 1;
+        x = (xM - box_w) / 2;
+        y = (yM - box_h) / 2;
     }
-    else
-    {
-        initTxtBox(blob, readText(file), (int)fileLines(file, 0), title, x, y, align);
-        blob->owns_txt = 1;
-    }
+    initTxtBox(blob, txt, rows, title, x, y, align);
     printBox(blob);
     return blob;
 }
@@ -561,7 +560,6 @@ txt_box *custTxtBox_str(char *txt[], int n, const char *title, int x, int y, int
     if (final_h > max_h)
         final_h = max_h;
 
-    /* recalcular posicion para que no se salga de pantalla */
     int pos_x = x;
     int pos_y = y;
     if (pos_x < 0)
@@ -581,6 +579,7 @@ txt_box *custTxtBox_str(char *txt[], int n, const char *title, int x, int y, int
 
 txt_box *custTxtBox_file(const char *file, const char *title, int x, int y, int w, int h, int align, int center)
 {
+    
     txt_box *blob = malloc(sizeof(txt_box));
     if(center)
     {

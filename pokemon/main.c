@@ -1,3 +1,4 @@
+#include <SDL2/SDL_mixer.h>
 #include <string.h>
 #include <unistd.h>
 #include <locale.h>
@@ -44,11 +45,13 @@ int main(void)
         switch (selection)
         {
             case 0: /* Combate */
+            {
                 if(Player.name[0] == '\0')
                     askName(&Player);
                 askPkmn(&Player);
                 combat(&Player);
                 break;
+            }
             case 1: /* Cambiar nombre */
                 askName(&Player);
                 break;
@@ -213,7 +216,20 @@ void combat(ply *cur)
     pkmn enemy = {0};
     char opponent_name[32] = {0};
     sendInfo(cur->monster, cur->name);
-    reciveInfo(&enemy, opponent_name, sizeof(opponent_name));
+    char *wait[] = {
+    "Esperando al otro jugador..."
+    };
+    txt_box *wait_ply = txtBox_str(wait, (int)(sizeof(wait)/sizeof(char*)), NULL, -1, -1, ALIGN_CENTER);
+    if(!reciveInfo(&enemy, opponent_name, sizeof(opponent_name)))
+    {
+        delBox(wait_ply);
+        char *error[] = {
+            "El otro jugador se desconecto"
+        };
+        dialFromStr(error, (int)(sizeof(error)/sizeof(char*)), "Error", -1, -1, ALIGN_CENTER);
+        return;
+    }
+    delBox(wait_ply);
     wclear(stdscr);
     wrefresh(stdscr);
 
@@ -244,11 +260,13 @@ void combat(ply *cur)
         sendMovement(cur->monster, mv);
         delBox(combat_box);
 
+        wait_ply = txtBox_str(wait, (int)(sizeof(wait)/sizeof(char*)), NULL, -1, -1, ALIGN_CENTER);
         int my_hp = cur->monster.hp;
         int enemy_hp = enemy.hp;
         int enemy_move = 0;
         if (!reciveTurnResult(&my_hp, &enemy_hp, &enemy_move))
             break;
+        delBox(wait_ply);
 
         cur->monster.hp = my_hp;
         enemy.hp = enemy_hp;
