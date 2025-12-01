@@ -1,36 +1,9 @@
-#ifndef SOUND_H
-#define SOUND_H
-
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_mixer.h>
 
-#define SFX_DIR "src/sfx/"
-#define MUSIC_DIR "src/music/"
+#include "sound.h"
 
-typedef struct sounds_{
-    Mix_Chunk **chunks;
-    int n;
-}sfx;
-
-typedef struct songs{
-    Mix_Music **chunks;
-    int n;
-}music;
-
-static int initAudio(void);
-void quitAudio(void);
-
-void playAndFreeSfx(const char *sound);
-
-sfx *initSfxLib(char *sounds[], int n);
-music *initMusicLib(char *songs[], int n);
-void freeSfxLib(sfx *cur);
-void freeMusicLib(music *cur);
-
-static int initAudio(void)
+int initAudio(void)
 {
     if (SDL_WasInit(SDL_INIT_AUDIO) == 0)
     {
@@ -181,5 +154,3 @@ void freeMusicLib(music *cur)
     cur->n = 0;
     free(cur);
 }
-
-#endif /* SOUND_H */

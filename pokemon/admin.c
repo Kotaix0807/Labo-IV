@@ -1,95 +1,157 @@
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
-#include <sys/shm.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
+#include <string.h>
 #include <unistd.h>
-#include <signal.h>
+#include <sys/msg.h>
+#include <sys/types.h>
+#include "structs.h"
+#include "ipc.h"
 
-#define clave 234 
-#define MAX 64
-#define MAX_MSGS 100
+#define MAX_PLAYERS 2
 
-struct {
-    long tipo;
-    char cadena[MAX];
-} mensaje;
+int recive_players();
+int recive_pkmn();
+
+int player_ids[MAX_PLAYERS] = {0};
+char player_pkmn[MAX_PLAYERS][32] = {{0}};
+char player_names[MAX_PLAYERS][32] = {{0}};
+key_t key;
+int msgid;
 
 int main()
 {
-    int msqid; /* identificador de la cola de mensajes */
-    int shmid;
-    key_t key = 1234;
-    FILE* file = fopen("resultados.txt", "w+");
     
-    int longitud = sizeof(mensaje) - sizeof(mensaje.tipo);
+    if(!recive_players())
+        return 1;
+    if(!recive_pkmn())
+        return 1;
 
-    if(!file)
-    {
-        printf("Error al abrir el archivo resultados.txt\n");
-        exit(-1);
-    }
-    /* Creación de la cola de mensajes */
+    pkmn player_1;
+    pkmn player_2;
+    pkmnSet(&player_1, player_pkmn[0], 1);
+    pkmnSet(&player_2, player_pkmn[1], 1);
 
-    if((msqid = msgget(clave, IPC_CREAT | 0600)) == -1)
-    {
-        perror("Error al crear la cola de mensajes");
-        exit(-1);
-    }
-
-    if ((shmid = shmget(key, sizeof(int), IPC_CREAT | IPC_EXCL | 0666)) < 0)
-    {
-        if (errno != EEXIST)
-        {
-            perror("Error al crear la memoria compartida");
-            exit(-1);
-        }
-        shmid = shmget(key, sizeof(int), 0666);
-        if (shmid < 0)
-        {
-            perror("Error al obtener memoria compartida existente");
-            exit(-1);
-        }
-    }
-    int recibidos = 0;
-    while (recibidos < MAX_MSGS)
-    {
-        if(msgrcv(msqid, &mensaje, longitud, 0, 0) == -1)
-        {
-            if (errno == EINTR)
-            {
-                continue;
-            }
-
-            if (errno == EIDRM || errno == EINVAL)
-            {
-                fprintf(stderr, "La cola de mensajes ya no es válida. Deteniendo recepción.\n");
-                break;
-            }
-
-            perror("Error al leer un mensaje de la cola de mensajes");
-            continue;
-        }
-
-        recibidos++;
-        printf("Mensaje #%d (tipo %ld) en RECEIVE: %s\n", recibidos, mensaje.tipo, mensaje.cadena);
-        fprintf(file, "%s\n", mensaje.cadena);
-    }
-    fclose(file);
-    printf("Se recibieron %d mensajes. Eliminando recursos IPC...\n", recibidos);
-
-    /* Borrado de la cola de mensajes */
-    if(msgctl(msqid, IPC_RMID, 0) == -1)
-    {
-        perror("Error al eliminar la cola de mensajes");
-    }   
-
-    if (shmctl(shmid, IPC_RMID, NULL) == -1)
-    {
-        perror("Error al eliminar memoria compartida");
-    }
-    //kill(getpid(), SIGTERM);
+    msgctl(msgid, IPC_RMID, NULL);
     return 0;
 }
+
+int recive_players()
+{
+    msg_data message = {0};
+    key = ftok(FTOK_PATH, ID);
+
+    msgid = msgget(key, 0666 | IPC_CREAT);
+
+    for(int i = 0; i < MAX_PLAYERS ; i++)
+    {
+        printf("Esperando jugadores... (%d/%d)\n", i, MAX_PLAYERS);
+        if (msgrcv(msgid, &message, sizeof(message) - sizeof(message.mtype), ADMIN, 0) == -1)
+        {
+            perror("msgrcv");
+            msgctl(msgid, IPC_RMID, NULL);
+            return 0;
+        }
+        if(message.player_cmd == CMD_JOIN)
+            printf("Jugador '%d' se unio!\n", message.player_id);
+        player_ids[i] = message.player_id;
+        message = (msg_data){0};
+    }
+    printf("\n");
+    usleep(100);
+    for (int i = 0; i < MAX_PLAYERS; i++)
+    {
+        msg_data respuesta = {0};
+        respuesta.mtype = PLAYERS + player_ids[i];
+        respuesta.player_id = player_ids[i];
+        if (msgsnd(msgid, &respuesta, sizeof(respuesta) - sizeof(respuesta.mtype), 0) == -1)
+        {
+            perror("msgsnd");
+            msgctl(msgid, IPC_RMID, NULL);
+            return 0;
+        }
+        printf("Respuesta enviada a ID %d (mtype %ld)\n", respuesta.player_id, respuesta.mtype);
+    }
+    return 1;
+}
+
+int recive_pkmn()
+{
+    printf("Esperando seleccion de pokemon...\n");
+    int info_count = 0;
+    while (info_count < MAX_PLAYERS)
+    {
+        pkmn_info_msg info = {0};
+        if (msgrcv(msgid, &info, sizeof(info) - sizeof(info.mtype), ADMIN, 0) == -1)
+        {
+            perror("msgrcv");
+            msgctl(msgid, IPC_RMID, NULL);
+            return 0;
+        }
+        if (info.player_cmd != CMD_SEND_INFO)
+        {
+            printf("Mensaje inesperado de %d (cmd %d)\n", info.player_id, info.player_cmd);
+            continue;
+        }
+        int idx = -1;
+        for (int i = 0; i < MAX_PLAYERS; i++)
+        {
+            if (player_ids[i] == info.player_id)
+            {
+                idx = i;
+                break;
+            }
+        }
+        if (idx == -1)
+        {
+            printf("ID %d no registrado, descartando\n", info.player_id);
+            continue;
+        }
+        strncpy(player_pkmn[idx], info.monster, sizeof(player_pkmn[idx]) - 1);
+        player_pkmn[idx][sizeof(player_pkmn[idx]) - 1] = '\0';
+        strncpy(player_names[idx], info.player_name, sizeof(player_names[idx]) - 1);
+        player_names[idx][sizeof(player_names[idx]) - 1] = '\0';
+        info_count++;
+        printf("Jugador %d (%s) eligio %s\n", info.player_id, player_names[idx], player_pkmn[idx]);
+    }
+
+    int change = MAX_PLAYERS - 1;
+    for (int i = 0; i < MAX_PLAYERS; i++)
+    {
+        pkmn_info_msg respuesta = {0};
+        respuesta.mtype = PLAYERS + player_ids[i];
+        respuesta.player_id = player_ids[i];
+        respuesta.player_cmd = CMD_SEND_INFO;
+        strncpy(respuesta.monster, player_pkmn[change], sizeof(respuesta.monster));
+        respuesta.monster[sizeof(respuesta.monster) - 1] = '\0';
+        strncpy(respuesta.player_name, player_names[change], sizeof(respuesta.player_name));
+        respuesta.player_name[sizeof(respuesta.player_name) - 1] = '\0';
+        if (msgsnd(msgid, &respuesta, sizeof(respuesta) - sizeof(respuesta.mtype), 0) == -1)
+        {
+            perror("msgsnd");
+            msgctl(msgid, IPC_RMID, NULL);
+            return 0;
+        }
+        printf("Respuesta enviada a ID %d (mtype %ld)\n", respuesta.player_id, respuesta.mtype);
+        change--;
+    }
+
+    return 1;
+}
+
+
+
+
+
+/*
+FUNCIONAMIENTO DE MSG.H:
+
+-llave -> ftok()
+
+-Crear/Buscar -> msgget()
+
+-Enviar mensaje -> msgsnd()
+
+-Recibir mensajes -> msgrcv()
+
+-Destruir cola -> msgctl()
+
+*/

@@ -1,0 +1,47 @@
+[
+  {
+    "directory": "/home/eloy/2025/elquezad/IntroaSO/Labo IV/pokemon",
+    "command": "gcc -g -Wall -Wextra -Werror -Iinclude -c main.c",
+    "file": "main.c"
+  },
+  {
+    "directory": "/home/eloy/2025/elquezad/IntroaSO/Labo IV/pokemon",
+    "command": "gcc -g -Wall -Wextra -Werror -Iinclude -c src/tools.c",
+    "file": "src/tools.c"
+  },
+  {
+    "directory": "/home/eloy/2025/elquezad/IntroaSO/Labo IV/pokemon",
+    "command": "gcc -g -Wall -Wextra -Werror -Iinclude -c src/structs.c",
+    "file": "src/structs.c"
+  },
+  {
+    "directory": "/home/eloy/2025/elquezad/IntroaSO/Labo IV/pokemon",
+    "command": "gcc -g -Wall -Wextra -Werror -Iinclude -c src/box.c",
+    "file": "src/box.c"
+  },
+  {
+    "directory": "/home/eloy/2025/elquezad/IntroaSO/Labo IV/pokemon",
+    "command": "gcc -g -Wall -Wextra -Werror -Iinclude -c src/opt.c",
+    "file": "src/opt.c"
+  },
+  {
+    "directory": "/home/eloy/2025/elquezad/IntroaSO/Labo IV/pokemon",
+    "command": "gcc -g -Wall -Wextra -Werror -Iinclude -c src/sound.c",
+    "file": "src/sound.c"
+  },
+  {
+    "directory": "/home/eloy/2025/elquezad/IntroaSO/Labo IV/pokemon",
+    "command": "gcc -g -Wall -Wextra -Werror -Iinclude -c admin.c",
+    "file": "admin.c"
+  },
+  {
+    "directory": "/home/eloy/2025/elquezad/IntroaSO/Labo IV/pokemon",
+    "command": "gcc -g -Wall -Wextra -Werror -Iinclude -c msgs/send.c",
+    "file": "msgs/send.c"
+  },
+  {
+    "directory": "/home/eloy/2025/elquezad/IntroaSO/Labo IV/pokemon",
+    "command": "gcc -g -Wall -Wextra -Werror -Iinclude -c msgs/recive.c",
+    "file": "msgs/recive.c"
+  }
+]

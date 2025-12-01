@@ -1,84 +1,9 @@
-#ifndef STRUCTS_H
-#define STRUCTS_H
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <ncurses.h>
+#include <stdlib.h>
 #include <math.h>
+#include <string.h>
+#include "structs.h"
 #include "tools.h"
-
-#define TYPE_NONE -1
-#define FIRE 0
-#define WATER 1
-#define PLANT 2
-#define POISON 3
-#define GROUND 4
-#define FLYING 5
-#define DRAGON 6
-#define ICE 7
-#define SINESTER 8
-#define NORMAL 9
-
-/*
-VENOSAUR:
--Giga Drain
--Sludge Bomb
--Earthquake
--Sleep Powder
-
-CHARIZARD:
--Flamethrower
--Air Slash
--Dragon Pulse
--Roost
-
-BLASTOISE:
--Surf
--Ice Beam
--Dark Pulse
--Rapid Spin
-
-*/
-
-
-typedef struct move_{
-    char *name;
-    int type;
-    unsigned int power;
-}move_t;
-
-typedef struct pokemon_{
-    //Informacion base
-    const char *name;
-    char **ascii;
-    int n_ascii;
-    int w;
-    
-    //Estadisticas
-    int type1;
-    int type2;
-    
-    move_t move_set[4];
-    int attack;
-    int defense;
-    int speed;
-    int hp;
-    int level;
-}pkmn;
-
-typedef struct player_{
-    char *name;
-    pkmn *monster;
-}ply;
-
-ply initPly();
-void pkmnSet(pkmn **monster, const char *name);
-void printPkmn(pkmn *monster, int x, int y);
-WINDOW *movePkmnWindow(pkmn *monster);
-WINDOW *printPkmnW(pkmn *monster, int x, int y);
-void clearWin(WINDOW *win);
-int formula(pkmn p, move_t used, pkmn e);
 
 /**
  * @brief Inicializar estructura jugador
@@ -88,39 +13,57 @@ int formula(pkmn p, move_t used, pkmn e);
 ply initPly()
 {
     ply current;
-    current.name = NULL;
-    current.monster = NULL;
+    memset(&current, 0, sizeof(ply));
     return current;
 }
 
-void pkmnSet(pkmn **monster, const char *name)
+static void copy_ascii(pkmn *m, char **src, int lines)
+{
+    if (!src || lines <= 0)
+        return;
+    int max_lines;
+    if (lines < 200)
+        max_lines = lines;
+    else
+        max_lines = 200;
+    for (int i = 0; i < max_lines; i++)
+    {
+        strncpy(m->ascii[i], src[i], sizeof(m->ascii[i]) - 1);
+        m->ascii[i][sizeof(m->ascii[i]) - 1] = '\0';
+    }
+    m->n_ascii = max_lines;
+}
+
+void pkmnSet(pkmn *monster, const char *name, int reverse)
 {
     if (!monster || !name)
         return;
 
-    if (*monster)
-    {
-        if ((*monster)->ascii)
-        {
-            for (int i = 0; i < (*monster)->n_ascii; i++)
-                free((*monster)->ascii[i]);
-            free((*monster)->ascii);
-        }
-        free(*monster);
-    }
+    char name_copy[sizeof(monster->name)];
+    strncpy(name_copy, name, sizeof(name_copy) - 1);
+    name_copy[sizeof(name_copy) - 1] = '\0';
 
-    pkmn *m = calloc(1, sizeof(pkmn));
-    if (!m)
-        return;
+    memset(monster, 0, sizeof(pkmn));
+    strncpy(monster->name, name_copy, sizeof(monster->name) - 1);
+    monster->name[sizeof(monster->name) - 1] = '\0';
+    monster->level = 50;
+    monster->type1 = TYPE_NONE;
+    monster->type2 = TYPE_NONE;
 
-    m->name = name;
-    m->level = 50;
-    m->type1 = TYPE_NONE;
-    m->type2 = TYPE_NONE;
+    char **ascii_lines = NULL;
+    int lines = 0;
+
     if(!strcmp(name, "Venosaur"))
     {
-        m->ascii = readText("art/venosaur.txt");
-        m->n_ascii = fileLines("art/venosaur.txt", 0);
+        if(reverse)
+        {
+            ascii_lines = readText("art/en_venosaur.txt");
+            lines = (int)fileLines("art/en_venosaur.txt", 0);
+        }
+        else {
+            ascii_lines = readText("art/venosaur.txt");
+            lines = (int)fileLines("art/venosaur.txt", 0);
+        }
         const char *moves[] = {
             "Giga Drain",
             "Sludge Bomb",
@@ -128,28 +71,35 @@ void pkmnSet(pkmn **monster, const char *name)
             "Sleep Powder"
         };
         for (int i = 0; i < 4; i++)
-            m->move_set[i].name = (char *)moves[i];
-        m->move_set[0].type = PLANT;
-        m->move_set[0].power = 75; /* Giga Drain */
-        m->move_set[1].type = POISON;
-        m->move_set[1].power = 90; /* Sludge Bomb */
-        m->move_set[2].type = GROUND;
-        m->move_set[2].power = 100; /* Earthquake */
-        m->move_set[3].type = PLANT;
-        m->move_set[3].power = 0; /* Sleep Powder, movimiento de estado */
+            strcpy(monster->move_set[i].name, moves[i]);
+        monster->move_set[0].type = PLANT;
+        monster->move_set[0].power = 75; /* Giga Drain */
+        monster->move_set[1].type = POISON;
+        monster->move_set[1].power = 90; /* Sludge Bomb */
+        monster->move_set[2].type = GROUND;
+        monster->move_set[2].power = 100; /* Earthquake */
+        monster->move_set[3].type = PLANT;
+        monster->move_set[3].power = 0; /* Sleep Powder, movimiento de estado */
 
-        m->type1 = PLANT;
-        m->type2 = POISON;
+        monster->type1 = PLANT;
+        monster->type2 = POISON;
         
-        m->attack = 102;
-        m->defense = 103;
-        m->speed = 100;
-        m->hp = 155;
+        monster->attack = 102;
+        monster->defense = 103;
+        monster->speed = 100;
+        monster->hp = 155;
     }
     else if(!strcmp(name, "Charizard"))
     {
-        m->ascii = readText("art/charizard.txt");
-        m->n_ascii = fileLines("art/charizard.txt", 0);
+        if(reverse)
+        {
+            ascii_lines = readText("art/en_charizard.txt");
+            lines = (int)fileLines("art/en_charizard.txt", 0);
+        }
+        else {
+            ascii_lines = readText("art/charizard.txt");
+            lines = (int)fileLines("art/charizard.txt", 0);
+        }
         const char *moves[] = {
             "Flamethrower",
             "Air Slash",
@@ -157,28 +107,35 @@ void pkmnSet(pkmn **monster, const char *name)
             "Roost"
         };
         for (int i = 0; i < 4; i++)
-            m->move_set[i].name = (char *)moves[i];
-        m->move_set[0].type = FIRE;
-        m->move_set[0].power = 90; /* Flamethrower */
-        m->move_set[1].type = FLYING;
-        m->move_set[1].power = 75; /* Air Slash */
-        m->move_set[2].type = DRAGON;
-        m->move_set[2].power = 85; /* Dragon Pulse */
-        m->move_set[3].type = FLYING;
-        m->move_set[3].power = 0; /* Roost, movimiento de recuperacion */
+            strcpy(monster->move_set[i].name, moves[i]);
+        monster->move_set[0].type = FIRE;
+        monster->move_set[0].power = 90; /* Flamethrower */
+        monster->move_set[1].type = FLYING;
+        monster->move_set[1].power = 75; /* Air Slash */
+        monster->move_set[2].type = DRAGON;
+        monster->move_set[2].power = 85; /* Dragon Pulse */
+        monster->move_set[3].type = FLYING;
+        monster->move_set[3].power = 0; /* Roost, movimiento de recuperacion */
 
-        m->type1 = FIRE;
-        m->type2 = FLYING;
+        monster->type1 = FIRE;
+        monster->type2 = FLYING;
 
-        m->attack = 104;
-        m->defense = 98;
-        m->speed = 120;
-        m->hp = 153;
+        monster->attack = 104;
+        monster->defense = 98;
+        monster->speed = 120;
+        monster->hp = 153;
     }
     else if(!strcmp(name, "Blastoise"))
     {
-        m->ascii = readText("art/blastoise.txt");
-        m->n_ascii = fileLines("art/blastoise.txt", 0);
+        if(reverse)
+        {
+            ascii_lines = readText("art/en_blastoise.txt");
+            lines = (int)fileLines("art/en_blastoise.txt", 0);
+        }
+        else {
+            ascii_lines = readText("art/blastoise.txt");
+            lines = (int)fileLines("art/blastoise.txt", 0);
+        }
         const char *moves[] = {
             "Surf",
             "Ice Beam",
@@ -186,26 +143,46 @@ void pkmnSet(pkmn **monster, const char *name)
             "Rapid Spin"
         };
         for (int i = 0; i < 4; i++)
-            m->move_set[i].name = (char *)moves[i];
-        m->move_set[0].type = WATER;
-        m->move_set[0].power = 90; /* Surf */
-        m->move_set[1].type = ICE;
-        m->move_set[1].power = 90; /* Ice Beam */
-        m->move_set[2].type = SINESTER;
-        m->move_set[2].power = 80; /* Dark Pulse */
-        m->move_set[3].type = NORMAL;
-        m->move_set[3].power = 50; /* Rapid Spin (poder actualizado) */
+            strcpy(monster->move_set[i].name, moves[i]);
+        monster->move_set[0].type = WATER;
+        monster->move_set[0].power = 90; /* Surf */
+        monster->move_set[1].type = ICE;
+        monster->move_set[1].power = 90; /* Ice Beam */
+        monster->move_set[2].type = SINESTER;
+        monster->move_set[2].power = 80; /* Dark Pulse */
+        monster->move_set[3].type = NORMAL;
+        monster->move_set[3].power = 50; /* Rapid Spin */
 
-        m->type1 = WATER;
-        m->type2 = TYPE_NONE;
+        monster->type1 = WATER;
+        monster->type2 = TYPE_NONE;
 
-        m->attack = 103;
-        m->defense = 120;
-        m->speed = 98;
-        m->hp = 154;
+        monster->attack = 103;
+        monster->defense = 120;
+        monster->speed = 98;
+        monster->hp = 154;
     }
-    m->w = largestStr_bra(m->ascii, m->n_ascii);
-    *monster = m;
+    else {
+        clear();
+        printw("ERROR [%s]", name);
+        refresh();
+    }
+
+    copy_ascii(monster, ascii_lines, lines);
+
+    if (monster->n_ascii > 0)
+    {
+        char *ascii_ptrs[200];
+        for (int i = 0; i < monster->n_ascii; i++)
+            ascii_ptrs[i] = monster->ascii[i];
+        monster->w = largestStr_bra(ascii_ptrs, monster->n_ascii);
+    }
+
+    if (ascii_lines)
+    {
+        for (int i = 0; i < lines; i++)
+            free(ascii_lines[i]);
+        free(ascii_lines);
+    }
 }
 
 void printPkmn(pkmn *monster, int x, int y)
@@ -217,7 +194,7 @@ void printPkmn(pkmn *monster, int x, int y)
     int win_h = h + 2;
     int win_w = w + 2;
 
-    int win_y, win_x;
+    int win_y = 0, win_x = 0;
 
     if(y < 0)
         win_y = (yM - win_h) / 2;
@@ -486,6 +463,3 @@ int formula(pkmn p, move_t used, pkmn e)
         damage = 1.0;
     return (int)damage;
 }
-
-
-#endif /* STRUCTS_H */

@@ -1,20 +1,8 @@
-#ifndef TOOLS_H
-#define TOOLS_H
-
+#include "tools.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <locale.h>
 #include <wchar.h>
-
-int largestStr(char *arr[], int n);
-int largestStr_bra(char *arr[], int n);
-int largestOpt(char *choices[], int n_choice, const char *title);
-unsigned long fileLines(const char *file, int opt);
-char **readText(const char *file);
-size_t u8_len(const char *s);
-int replace_fmt(char **arr, int idx, const char *arg);
-
 /**
  * @brief Recorre un arreglo de strings, y devuelve la cantidad del string mas largo
  * 
@@ -91,24 +79,23 @@ unsigned long fileLines(const char *file, int opt)
         return 0;
     }
     unsigned long lines_count = 0, char_count = 0, WMAX = 0;
-    char t;
+    int t;
     while ((t = fgetc(txt)) != EOF)
-	{
-
+    {
         if (t == '\n' || t == '\r')
-		{
-			if(char_count > WMAX)
-			{
-				WMAX = char_count;
-			}
+        {
+            if(char_count > WMAX)
+                WMAX = char_count;
             lines_count++;
-			char_count = 0;
-		}
-		else
-			char_count++;
+            char_count = 0;
+        }
+        else
+        {
+            char_count++;
+        }
     }
-	if(lines_count > 1)
-		lines_count++; //Linea adicional porque no existe \n inicial
+    if(lines_count > 1)
+        lines_count++; //Linea adicional porque no existe \n inicial
     fclose(txt);
     if (opt == 0)
         return lines_count;
@@ -201,4 +188,3 @@ int replace_fmt(char **arr, int idx, const char *arg)
     arr[idx] = buf;
     return 0;
 }
-#endif /* TOOLS_H */
