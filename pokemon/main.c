@@ -22,6 +22,8 @@ int connect();
 int loadGame();
 int sendInfo(pkmn monster, const char *name);
 int reciveInfo(pkmn *monster, char *enemy_name, size_t enemy_size);
+int sendMovement(pkmn monster, int move);
+int reciveTurnResult(int *my_hp, int *enemy_hp, int *enemy_move);
 void combat(ply *cur);
 void closeGame();
 
@@ -56,6 +58,16 @@ int main(void)
             default:
                 break;
         }
+    }
+    msg_data message = {
+        .mtype = ADMIN,
+        .player_cmd = CMD_EXIT,
+        .player_id = ply_id
+    };
+    if (msgsnd(msgid, &message, sizeof(message) - sizeof(message.mtype), 0) == -1)
+    {
+        perror("msgsnd");
+        return 1;
     }
     closeGame();
     return 0;
@@ -125,8 +137,8 @@ int sendInfo(pkmn monster, const char *name)
         .player_id = ply_id,
         .player_cmd = CMD_SEND_INFO
     };
-    strncpy(message.monster, monster.name, sizeof(message.monster) - 1);
-    message.monster[sizeof(message.monster) - 1] = '\0';
+    strncpy(message.pkmn_name, monster.name, sizeof(message.pkmn_name) - 1);
+    message.pkmn_name[sizeof(message.pkmn_name) - 1] = '\0';
     if (name)
     {
         strncpy(message.player_name, name, sizeof(message.player_name) - 1);
@@ -150,12 +162,49 @@ int reciveInfo(pkmn *monster, char *enemy_name, size_t enemy_size)
         perror("msgrcv");
         return 0;
     }
-    pkmnSet(monster, message.monster, 1);
+    pkmnSet(monster, message.pkmn_name, 1);
     if (enemy_name && enemy_size > 0)
     {
         strncpy(enemy_name, message.player_name, enemy_size - 1);
         enemy_name[enemy_size - 1] = '\0';
     }
+    return 1;
+}
+
+int sendMovement(pkmn monster, int move)
+{
+    mv_msg_data message = {
+        .mtype = ADMIN,
+        .player_id = ply_id,
+        .move = move
+    };
+    strncpy(message.pkmn_name, monster.name, sizeof(message.pkmn_name) - 1);
+    message.pkmn_name[sizeof(message.pkmn_name) - 1] = '\0';
+    if (msgsnd(msgid, &message, sizeof(message) - sizeof(message.mtype), 0) == -1)
+    {
+        perror("msgsnd");
+        return 0;
+    }
+    return 1;
+}
+
+int reciveTurnResult(int *my_hp, int *enemy_hp, int *enemy_move)
+{
+    turn_msg_data msg = {0};
+    long target_type = PLAYERS + ply_id;
+    if (msgrcv(msgid, &msg, sizeof(msg) - sizeof(msg.mtype), target_type, 0) == -1)
+    {
+        perror("msgrcv");
+        return 0;
+    }
+    if (msg.player_cmd != CMD_TURN_RESULT)
+        return 0;
+    if (my_hp)
+        *my_hp = msg.my_hp;
+    if (enemy_hp)
+        *enemy_hp = msg.enemy_hp;
+    if (enemy_move)
+        *enemy_move = msg.enemy_move;
     return 1;
 }
 
@@ -167,11 +216,12 @@ void combat(ply *cur)
     reciveInfo(&enemy, opponent_name, sizeof(opponent_name));
     wclear(stdscr);
     wrefresh(stdscr);
-    
+
+    int enemy_h = enemy.n_ascii;
+    int player_h = cur->monster.n_ascii;
     int xM, yM;
     getmaxyx(stdscr, yM, xM);
     
-    int enemy_h = enemy.n_ascii;
     //int player_h = cur->monster.n_ascii;
     while(1)
     {
@@ -183,7 +233,7 @@ void combat(ply *cur)
             "Tu oponente es: %s"
         };
         replace_fmt(init, 0, cur->name);
-        replace_fmt(init, 1, opponent_name[0] ? opponent_name : enemy.name);
+        replace_fmt(init, 1, opponent_name);
         int init_lines = (int)(sizeof(init)/sizeof(char*));
         int init_h = 10 - init_lines;
         txt_box *combat_box = custTxtBox_str(init, init_lines, NULL, 1, (yM - init_h - 2), 40, init_h, ALIGN_CENTER);
@@ -191,9 +241,19 @@ void combat(ply *cur)
         for (int i = 0; i < 4; i++)
             move_names[i] = cur->monster.move_set[i].name;
         int mv = menu("Que deseas hacer?", move_names, 4, 1, (yM - 6));
+        sendMovement(cur->monster, mv);
         delBox(combat_box);
 
-        //Ataca
+        int my_hp = cur->monster.hp;
+        int enemy_hp = enemy.hp;
+        int enemy_move = 0;
+        if (!reciveTurnResult(&my_hp, &enemy_hp, &enemy_move))
+            break;
+
+        cur->monster.hp = my_hp;
+        enemy.hp = enemy_hp;
+
+        //Ataca jugador
         char *used[] = {
             "%s uso:",
             "%s!"
@@ -203,70 +263,62 @@ void combat(ply *cur)
         int used_lines = (int)(sizeof(used)/sizeof(char*));
         int used_h = 10 - used_lines;
         txt_box *use = custTxtBox_str(used, used_lines, NULL, 1, (yM - used_h - 2), 40, used_h, ALIGN_CENTER);
-        napms(1000);
-        flushinp(); /* descartar teclas pulsadas durante la pausa */
+        getch();
         delBox(use);
-        int damage = formula(cur->monster, cur->monster.move_set[mv], enemy);
-        if(enemy.hp > damage)
-            enemy.hp -= damage;
-        else
-        {
-            enemy.hp = 0;
-            for(int i = 0; i < enemy_h; i++)
-            {
-                if(enemy.n_ascii > 0)
-                    enemy.n_ascii--;
-                printPkmnW(&enemy, (xM - enemy.w - 2), 0);
-                napms(45);
-                flushinp();
-            }
-            clearWin(enemy_win);
-            clearWin(player_win);
+
+        // Ataca enemigo
+        char *enm_used[] = {
+            "%s uso:",
+            "%s!"
+        };
+        replace_fmt(enm_used, 0, enemy.name);
+        replace_fmt(enm_used, 1, enemy.move_set[enemy_move].name);
+        int en_lines = (int)(sizeof(enm_used)/sizeof(char*));
+        int en_h = 10 - en_lines;
+        txt_box *enm_box = custTxtBox_str(enm_used, en_lines, NULL, 1, (yM - en_h - 2), 40, en_h, ALIGN_CENTER);
+        getch();
+        delBox(enm_box);
+
+        if (enemy.hp <= 0 || cur->monster.hp <= 0)
             break;
-        }
-        printPkmnW(&enemy, (xM - enemy.w - 2), 0);
-        /*
-        txt_box *use = custTxtBox_str(used, used_lines, NULL, 1, (yM - used_h - 2), 40, used_h, ALIGN_CENTER);
-
-        for (int i = 0; i < 4; i++)
-            free(move_names[i]);
-        free(move_names);
-
-        for (int i = 0; i < 4; i++)
-            move_names[i] = enemy.move_set[i].name;
-        mv = rand() % 3;
-        replace_fmt(used, 0, enemy.name);
-        replace_fmt(used, 1, enemy.move_set[mv].name);
-        napms(1000);
-        int damage = formula(enemy, enemy.move_set[mv], cur->monster);
-        if(cur->monster.hp > damage)
-            cur->monster.hp -= damage;
-        else
-        {
-            cur->monster.hp = 0;
-            for(int i = 0; i < player_h; i++)
-            {
-                if(cur->monster.n_ascii > 0)
-                    cur->monster.n_ascii--;
-                printPkmnW(&cur->monster, (xM - cur->monster.w - 2), 0);
-                napms(45);
-                flushinp();
-            }
-            clearWin(enemy_win);
-            clearWin(player_win);
-            break;
-        }
-
-        */
         clearWin(enemy_win);
         clearWin(player_win);
     }
-    char *end[] = {
-        "Felicidades %s!",
-        "Haz ganado el combate pokemon"
-    };
-    replace_fmt(end, 0, cur->name);
-    dialFromStr(end, 2, "Winner!", -1, -1, ALIGN_CENTER);
+    if(enemy.hp <= 0)
+    {
+        for(int i = 0; i < enemy_h; i++)
+        {
+            if(enemy.n_ascii > 0)
+                enemy.n_ascii--;
+            printPkmnW(&enemy, (xM - enemy.w - 2), 0);
+            napms(45);
+            flushinp();
+        }
+        napms(100);
+        char *end[] = {
+            "Felicidades %s!",
+            "Haz ganado el combate pokemon"
+        };
+        replace_fmt(end, 0, cur->name);
+        dialFromStr(end, 2, "Winner!", -1, -1, ALIGN_CENTER);
+    }
+    else{
+        for(int i = 0; i < player_h; i++)
+        {
+            if(cur->monster.n_ascii > 0)
+                cur->monster.n_ascii--;
+            printPkmnW(&cur->monster, 45, 15);
+            napms(45);
+            flushinp();
+        }
+        napms(100);
+        char *end[] = {
+            "Lastima %s...!",
+            "Tu pokemon se debilito"
+        };
+        replace_fmt(end, 0, cur->name);
+        dialFromStr(end, 2, "Perdedor...", -1, -1, ALIGN_CENTER);
+    }
 
     wclear(stdscr);
     wrefresh(stdscr);
